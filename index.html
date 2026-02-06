@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entretien</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin: 0; background: #f6f7f9; color: #111; }
+    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; }
+    h1 { margin: 0; font-size: 18px; }
+    main { padding: 12px; max-width: 980px; margin: 0 auto; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 600; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    button.danger { border-color: #ffced0; }
+    button:active { transform: scale(0.99); }
+    .card { background: #fff; border: 1px solid #e6e8ee; border-radius: 14px; padding: 10px; box-shadow: 0 1px 0 rgba(0,0,0,.02); }
+    .list { display: grid; gap: 10px; margin-top: 12px; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 46px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #eef0f6;
+      border-radius: 12px;
+    }
+    .row.selected { outline: 2px solid #111; }
+    .desc {
+      font-weight: 700;
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: default;
+      max-width: 60ch;
+      word-break: break-word;
+    }
+    .meta { font-size: 12px; color: #555; margin-top: 2px; }
+    .status { font-size: 12px; font-weight: 800; padding: 6px 8px; border-radius: 999px; border: 1px solid #eee; }
+    .due { color: #b00020; border-color: #ffd3da; background: #fff5f6; }
+    .ok { color: #116b2f; border-color: #cfe9d8; background: #f3fbf6; }
+    .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+    .thumb { font-size: 18px; padding: 8px 10px; border-radius: 12px; }
+    .pill { font-size: 12px; border: 1px solid #e6e8ee; border-radius: 999px; padding: 6px 10px; background: #fff; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 14px; }
+    label { font-size: 12px; color: #333; font-weight: 700; display: block; margin: 10px 0 6px; }
+
+    dialog { width: min(520px, 92vw); border: 1px solid #e6e8ee; border-radius: 14px; padding: 0; }
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+    .modal-head { padding: 12px 14px; border-bottom: 1px solid #eef0f6; display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 12px 14px; }
+    .modal-foot { padding: 12px 14px; border-top: 1px solid #eef0f6; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .count { float: right; font-size: 12px; color: #666; }
+    .tabs { display: flex; gap: 8px; margin-top: 10px; }
+    .tabs button { flex: 1; }
+    .hidden { display: none; }
+    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; }
+    .hist-item .t { font-weight: 800; }
+    .hist-item .s { font-size: 12px; color: #555; margin-top: 2px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Entretien</h1>
+  <div class="toolbar">
+    <button class="primary" id="btnAdd">+ Ajouter</button>
+    <button id="btnHistory">Historique</button>
+    <span class="pill" id="stats">—</span>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input id="search" placeholder="Recherche description…" />
+      <select id="filter">
+        <option value="all">Tous</option>
+        <option value="due">DU seulement</option>
+      </select>
+      <select id="sort">
+        <option value="dueFirst">Tri: DU d’abord</option>
+        <option value="name">Tri: Nom</option>
+        <option value="next">Tri: Prochaine échéance</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="list" id="list"></div>
+</main>
+
+<!-- Modal Ajout/Modification -->
+<dialog id="dlgEdit">
+  <div class="modal-head">
+    <strong id="dlgTitle">Ajouter</strong>
+    <button id="btnCloseEdit" aria-label="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <label>
+      Description <span class="count" id="descCount">0/50</span>
+      <input id="fDesc" maxlength="50" placeholder="Ex: Changer filtre fournaise" />
+    </label>
+
+    <label>Date début
+      <input id="fStart" type="date" />
+    </label>
+
+    <label>Intervalle (jours)
+      <input id="fInt" type="number" min="1" step="1" placeholder="Ex: 90" />
+    </label>
+  </div>
+  <div class="modal-foot">
+    <button id="btnDelete" class="danger hidden">Supprimer</button>
+    <button id="btnCancel">Annuler</button>
+    <button id="btnSave" class="primary">Enregistrer</button>
+  </div>
+</dialog>
+
+<!-- Modal Historique regroupé -->
+<dialog id="dlgHistory">
+  <div class="modal-head">
+    <strong>Historique</strong>
+    <button id="btnCloseHist" aria-label="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="tabs">
+      <button id="tabGlobal" class="primary">Regroupé global</button>
+      <button id="tabByItem">Par item</button>
+    </div>
+
+    <div id="viewGlobal" style="margin-top:12px; display:grid; gap:10px;"></div>
+
+    <div id="viewByItem" class="hidden" style="margin-top:12px;">
+      <select id="histItemSelect"></select>
+      <div id="histItemEvents" style="margin-top:10px; display:grid; gap:10px;"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button id="btnClearHist" class="danger">Vider l’historique</button>
+    <button id="btnCloseHist2" class="primary">OK</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  // ===== Utils dates =====
+  const pad2 = n => String(n).padStart(2, "0");
+  const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const fromYMD = (s) => {
+    // s: YYYY-MM-DD
+    const [y,m,d] = s.split("-").map(Number);
+    return new Date(y, m-1, d, 0,0,0,0);
+  };
+  const startOfToday = () => {
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  };
+  const daysBetween = (a, b) => { // b - a in full days
+    const ms = b.getTime() - a.getTime();
+    return Math.floor(ms / 86400000);
+  };
+  const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
+  const fmtDT = (ts) => {
+    const d = new Date(ts);
+    return d.toLocaleString("fr-CA", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+  };
+
+  // ===== IndexedDB =====
+  const DB_NAME = "EntretienDB";
+  const DB_VER  = 1;
+  let db;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = (e) => {
+        const db = req.result;
+
+        const items = db.createObjectStore("items", { keyPath: "id" });
+        items.createIndex("by_desc", "description", { unique: false });
+
+        const checks = db.createObjectStore("checks", { keyPath: "id" });
+        checks.createIndex("by_item", "itemId", { unique: false });
+        checks.createIndex("by_ts", "dateCheck", { unique: false });
+
+        const alerts = db.createObjectStore("alerts", { keyPath: "id" });
+        alerts.createIndex("by_item", "itemId", { unique: false });
+        alerts.createIndex("by_dueKey", "dueKey", { unique: false }); // itemId|dueYMD
+        alerts.createIndex("by_ts", "dateAlert", { unique: false });
+
+        const meta = db.createObjectStore("meta", { keyPath: "key" });
+        meta.put({ key: "seed", value: 1 });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function tx(storeNames, mode="readonly") {
+    const t = db.transaction(storeNames, mode);
+    return { t, stores: Object.fromEntries(storeNames.map(n => [n, t.objectStore(n)])) };
+  }
+
+  async function nextId() {
+    const { t, stores } = tx(["meta"], "readwrite");
+    return await new Promise((resolve, reject) => {
+      const get = stores.meta.get("seed");
+      get.onsuccess = () => {
+        const seed = get.result?.value ?? 1;
+        stores.meta.put({ key: "seed", value: seed + 1 });
+        t.oncomplete = () => resolve(seed);
+      };
+      get.onerror = () => reject(get.error);
+    });
+  }
+
+  function getAll(storeName, indexName=null, query=null) {
+    return new Promise((resolve, reject) => {
+      const { stores } = tx([storeName], "readonly");
+      const source = indexName ? stores[storeName].index(indexName) : stores[storeName];
+      const req = query ? source.getAll(query) : source.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function put(storeName, value) {
+    return new Promise((resolve, reject) => {
+      const { t, stores } = tx([storeName], "readwrite");
+      stores[storeName].put(value);
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  function del(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const { t, stores } = tx([storeName], "readwrite");
+      stores[storeName].delete(key);
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  async function deleteItemCascade(itemId) {
+    // delete item + related checks + alerts
+    const checks = await getAll("checks", "by_item", itemId);
+    const alerts = await getAll("alerts", "by_item", itemId);
+
+    const { t, stores } = tx(["items","checks","alerts"], "readwrite");
+    stores.items.delete(itemId);
+    checks.forEach(c => stores.checks.delete(c.id));
+    alerts.forEach(a => stores.alerts.delete(a.id));
+
+    return await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  // ===== Business logic =====
+  async function lastCheckTs(itemId) {
+    const list = await getAll("checks", "by_item", itemId);
+    if (!list.length) return null;
+    list.sort((a,b)=>b.dateCheck - a.dateCheck);
+    return list[0].dateCheck;
+  }
+
+  async function computeStatus(item) {
+    const today = startOfToday();
+    const last = await lastCheckTs(item.id);
+    const ref = last ? new Date(last) : fromYMD(item.dateDebut);
+    ref.setHours(0,0,0,0);
+
+    const dueDate = addDays(ref, Number(item.intervalJours));
+    dueDate.setHours(0,0,0,0);
+
+    const daysDue = Math.max(0, daysBetween(dueDate, today)); // today - dueDate
+    const isDue = today.getTime() >= dueDate.getTime();
+    return { lastTs: last, refDate: ref, dueDate, isDue, daysDue };
+  }
+
+  async function ensureAlertLogged(item, status) {
+    if (!status.isDue) return;
+    const dueYMD = toYMD(status.dueDate);
+    const dueKey = `${item.id}|${dueYMD}`;
+
+    // If already logged for this dueKey, do nothing
+    const all = await getAll("alerts");
+    if (all.some(a => a.dueKey === dueKey)) return;
+
+    const id = await nextId();
+    await put("alerts", {
+      id,
+      itemId: item.id,
+      dueKey,
+      dueDateYMD: dueYMD,
+      dateAlert: Date.now()
+    });
+  }
+
+  // ===== UI =====
+  const elList = document.querySelector("#list");
+  const elStats = document.querySelector("#stats");
+  const elSearch = document.querySelector("#search");
+  const elFilter = document.querySelector("#filter");
+  const elSort = document.querySelector("#sort");
+
+  // Edit modal
+  const dlgEdit = document.querySelector("#dlgEdit");
+  const dlgTitle = document.querySelector("#dlgTitle");
+  const fDesc = document.querySelector("#fDesc");
+  const fStart = document.querySelector("#fStart");
+  const fInt = document.querySelector("#fInt");
+  const descCount = document.querySelector("#descCount");
+  const btnDelete = document.querySelector("#btnDelete");
+
+  // History modal
+  const dlgHistory = document.querySelector("#dlgHistory");
+  const viewGlobal = document.querySelector("#viewGlobal");
+  const viewByItem = document.querySelector("#viewByItem");
+  const viewGlobalBox = document.querySelector("#viewGlobal");
+  const histItemSelect = document.querySelector("#histItemSelect");
+  const histItemEvents = document.querySelector("#histItemEvents");
+  const tabGlobal = document.querySelector("#tabGlobal");
+  const tabByItem = document.querySelector("#tabByItem");
+
+  let selectedRowIndex = -1;
+  let currentItems = [];
+  let editingId = null;
+
+  function setDescCount() {
+    descCount.textContent = `${fDesc.value.length}/50`;
+  }
+  fDesc.addEventListener("input", setDescCount);
+
+  function openEdit(item=null) {
+    editingId = item ? item.id : null;
+    dlgTitle.textContent = item ? "Modifier" : "Ajouter";
+    fDesc.value = item ? item.description : "";
+    fStart.value = item ? item.dateDebut : toYMD(startOfToday());
+    fInt.value = item ? item.intervalJours : "30";
+    setDescCount();
+
+    btnDelete.classList.toggle("hidden", !item);
+    dlgEdit.showModal();
+    setTimeout(()=>fDesc.focus(), 50);
+  }
+
+  function closeEdit() { dlgEdit.close(); }
+
+  async function saveEdit() {
+    const description = fDesc.value.trim();
+    if (!description) return alert("Description requise.");
+    if (description.length > 50) return alert("Max 50 caractères.");
+    const dateDebut = fStart.value;
+    if (!dateDebut) return alert("Date début requise.");
+    const intervalJours = Number(fInt.value);
+    if (!Number.isFinite(intervalJours) || intervalJours < 1) return alert("Intervalle (jours) doit être >= 1.");
+
+    if (editingId == null) {
+      const id = await nextId();
+      await put("items", { id, description, dateDebut, intervalJours });
+    } else {
+      await put("items", { id: editingId, description, dateDebut, intervalJours });
+    }
+    closeEdit();
+    await render();
+  }
+
+  async function doDelete() {
+    if (editingId == null) return;
+    const ok = confirm("Supprimer cet entretien (et son historique) ?");
+    if (!ok) return;
+    await deleteItemCascade(editingId);
+    closeEdit();
+    await render();
+  }
+
+  async function markDone(itemId) {
+    const item = currentItems.find(x => x.id === itemId);
+    if (!item) return;
+
+    const ok = confirm(`Confirmer "Fait" pour :\n\n${item.description}`);
+    if (!ok) return;
+
+    const id = await nextId();
+    await put("checks", { id, itemId, dateCheck: Date.now() });
+    await render();
+  }
+
+  function selectRow(i) {
+    selectedRowIndex = i;
+    [...elList.querySelectorAll(".row")].forEach((r, idx) => {
+      r.classList.toggle("selected", idx === i);
+    });
+  }
+
+  async function render() {
+    const q = elSearch.value.trim().toLowerCase();
+    const filter = elFilter.value;
+    const sort = elSort.value;
+
+    const items = await getAll("items");
+    // compute statuses
+    const computed = [];
+    for (const it of items) {
+      const st = await computeStatus(it);
+      await ensureAlertLogged(it, st); // log alert once per due period
+      computed.push({ item: it, st });
+    }
+
+    // apply search/filter
+    let rows = computed.filter(({item, st}) => {
+      if (q && !item.description.toLowerCase().includes(q)) return false;
+      if (filter === "due" && !st.isDue) return false;
+      return true;
+    });
+
+    // sort
+    rows.sort((a,b) => {
+      if (sort === "name") return a.item.description.localeCompare(b.item.description, "fr");
+      if (sort === "next") return a.st.dueDate - b.st.dueDate;
+      // dueFirst
+      if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
+      return a.st.dueDate - b.st.dueDate;
+    });
+
+    currentItems = rows.map(r => r.item);
+
+    // stats
+    const dueCount = rows.filter(r => r.st.isDue).length;
+    elStats.textContent = `${rows.length} item(s) • ${dueCount} DU`;
+
+    // render list
+    elList.innerHTML = "";
+    rows.forEach(({item, st}, idx) => {
+      const dueBadge = st.isDue
+        ? `<span class="status due">DU (${st.daysDue} j)</span>`
+        : `<span class="status ok">OK</span>`;
+
+      const nextYMD = toYMD(st.dueDate);
+      const lastTxt = st.lastTs ? fmtDT(st.lastTs) : "—";
+
+      const row = document.createElement("div");
+      row.className = "row";
+      row.tabIndex = 0;
+      row.dataset.idx = String(idx);
+
+      row.innerHTML = `
+        <button class="thumb" title="Marquer comme fait">👍</button>
+        <div>
+          <div class="desc">${escapeHtml(item.description)}</div>
+          <div class="meta">
+            Début: ${item.dateDebut} • Intervalle: ${item.intervalJours} j • Prochaine: ${nextYMD} • Dernier fait: ${lastTxt}
+          </div>
+        </div>
+        <div class="actions">
+          ${dueBadge}
+          <button title="Modifier">✏️</button>
+          <button class="danger" title="Supprimer">🗑️</button>
+        </div>
+      `;
+
+      // selection + pilotable
+      row.addEventListener("click", (e) => {
+        selectRow(idx);
+      });
+
+      // buttons
+      const btnThumb = row.querySelector(".thumb");
+      const btnEdit = row.querySelectorAll(".actions button")[1];
+      const btnDel  = row.querySelectorAll(".actions button")[2];
+
+      btnThumb.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await markDone(item.id);
+      });
+
+      btnEdit.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openEdit(item);
+      });
+
+      btnDel.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const ok = confirm(`Supprimer (et l’historique) :\n\n${item.description} ?`);
+        if (!ok) return;
+        await deleteItemCascade(item.id);
+        await render();
+      });
+
+      elList.appendChild(row);
+    });
+
+    // keep selection valid
+    if (rows.length === 0) selectedRowIndex = -1;
+    else if (selectedRowIndex >= rows.length) selectedRowIndex = rows.length - 1;
+    if (selectedRowIndex >= 0) selectRow(selectedRowIndex);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+  }
+
+  // Keyboard navigation
+  document.addEventListener("keydown", async (e) => {
+    // avoid when dialogs open
+    if (dlgEdit.open || dlgHistory.open) return;
+    const rows = [...elList.querySelectorAll(".row")];
+    if (!rows.length) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const i = Math.min(rows.length - 1, Math.max(0, selectedRowIndex + 1));
+      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const i = Math.max(0, selectedRowIndex - 1);
+      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = currentItems[selectedRowIndex];
+      if (item) openEdit(item);
+    } else if (e.key === " ") {
+      e.preventDefault();
+      const item = currentItems[selectedRowIndex];
+      if (item) await markDone(item.id);
+    }
+  });
+
+  // Search/filter/sort triggers
+  [elSearch, elFilter, elSort].forEach(el => el.addEventListener("input", render));
+  elFilter.addEventListener("change", render);
+  elSort.addEventListener("change", render);
+
+  // Buttons
+  document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
+  document.querySelector("#btnCloseEdit").addEventListener("click", closeEdit);
+  document.querySelector("#btnCancel").addEventListener("click", closeEdit);
+  document.querySelector("#btnSave").addEventListener("click", saveEdit);
+  document.querySelector("#btnDelete").addEventListener("click", doDelete);
+
+  // History
+  document.querySelector("#btnHistory").addEventListener("click", openHistory);
+  document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
+  document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
+
+  tabGlobal.addEventListener("click", () => setHistTab("global"));
+  tabByItem.addEventListener("click", () => setHistTab("item"));
+
+  async function openHistory() {
+    await renderHistoryGlobal();
+    await renderHistoryItemPicker();
+    setHistTab("global");
+    dlgHistory.showModal();
+  }
+
+  function setHistTab(which) {
+    const isGlobal = which === "global";
+    viewGlobal.classList.toggle("hidden", !isGlobal);
+    viewByItem.classList.toggle("hidden", isGlobal);
+    tabGlobal.classList.toggle("primary", isGlobal);
+    tabByItem.classList.toggle("primary", !isGlobal);
+  }
+
+  async function renderHistoryGlobal() {
+    const items = await getAll("items");
+    const byId = Object.fromEntries(items.map(i => [i.id, i.description]));
+
+    const checks = await getAll("checks");
+    const alerts = await getAll("alerts");
+
+    const events = [];
+
+    checks.forEach(c => events.push({
+      type: "done",
+      ts: c.dateCheck,
+      itemId: c.itemId,
+      extra: null
+    }));
+
+    alerts.forEach(a => {
+      // days due at alert time
+      const dueDate = fromYMD(a.dueDateYMD);
+      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
+      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
+      events.push({
+        type: "alert",
+        ts: a.dateAlert,
+        itemId: a.itemId,
+        extra: { dueDateYMD: a.dueDateYMD, daysDue }
+      });
+    });
+
+    events.sort((a,b) => b.ts - a.ts);
+
+    viewGlobalBox.innerHTML = events.length ? "" : `<div class="hist-item">Aucun historique.</div>`;
+    for (const ev of events.slice(0, 200)) {
+      const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
+      const box = document.createElement("div");
+      box.className = "hist-item";
+      if (ev.type === "done") {
+        box.innerHTML = `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`;
+      } else {
+        box.innerHTML = `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
+                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      }
+      viewGlobalBox.appendChild(box);
+    }
+  }
+
+  async function renderHistoryItemPicker() {
+    const items = await getAll("items");
+    histItemSelect.innerHTML = "";
+    items.sort((a,b)=>a.description.localeCompare(b.description,"fr")).forEach(it => {
+      const opt = document.createElement("option");
+      opt.value = String(it.id);
+      opt.textContent = it.description;
+      histItemSelect.appendChild(opt);
+    });
+    histItemSelect.addEventListener("change", renderHistoryForSelectedItem);
+    await renderHistoryForSelectedItem();
+  }
+
+  async function renderHistoryForSelectedItem() {
+    const itemId = Number(histItemSelect.value);
+    if (!itemId) { histItemEvents.innerHTML = ""; return; }
+
+    const item = (await getAll("items")).find(x => x.id === itemId);
+    const checks = await getAll("checks", "by_item", itemId);
+    const alerts = await getAll("alerts", "by_item", itemId);
+
+    const events = [];
+    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck }));
+    alerts.forEach(a => {
+      const dueDate = fromYMD(a.dueDateYMD);
+      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
+      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
+      events.push({ type:"alert", ts:a.dateAlert, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
+    });
+    events.sort((a,b)=>b.ts - a.ts);
+
+    histItemEvents.innerHTML = "";
+    const title = document.createElement("div");
+    title.className = "hist-item";
+    title.innerHTML = `<div class="t">📌 ${escapeHtml(item?.description ?? "")}</div>`;
+    histItemEvents.appendChild(title);
+
+    if (!events.length) {
+      const empty = document.createElement("div");
+      empty.className = "hist-item";
+      empty.textContent = "Aucun événement pour cet item.";
+      histItemEvents.appendChild(empty);
+      return;
+    }
+
+    for (const ev of events.slice(0, 200)) {
+      const box = document.createElement("div");
+      box.className = "hist-item";
+      if (ev.type === "done") {
+        box.innerHTML = `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`;
+      } else {
+        box.innerHTML = `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
+                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      }
+      histItemEvents.appendChild(box);
+    }
+  }
+
+  document.querySelector("#btnClearHist").addEventListener("click", async () => {
+    const ok = confirm("Vider tout l’historique (Fait + Alertes) ? Les items restent.");
+    if (!ok) return;
+
+    // Clear stores checks & alerts
+    const { t, stores } = tx(["checks","alerts"], "readwrite");
+    stores.checks.clear();
+    stores.alerts.clear();
+    await new Promise((resolve, reject) => {
+      t.oncomplete = resolve;
+      t.onerror = () => reject(t.error);
+    });
+
+    await renderHistoryGlobal();
+    await render();
+  });
+
+  // Auto refresh every 5 min
+  setInterval(render, 5 * 60 * 1000);
+
+  // Init
+  (async function init() {
+    db = await openDB();
+    await render();
+  })();
+
+})();
+</script>
+</body>
+</html>
