@@ -7,16 +7,17 @@
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     body { margin: 0; background: #f6f7f9; color: #111; }
-    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 2; }
+    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 3; }
     h1 { margin: 0; font-size: 18px; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 110px; }
+    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 120px; }
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
     button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
     button.primary { background: #111; color: #fff; border-color: #111; }
     button.danger { border-color: #ffced0; }
     button:active { transform: scale(0.99); }
     button[disabled]{ opacity:.55; }
-    .card { background: #fff; border: 1px solid #e6e8ee; border-radius: 14px; padding: 10px; box-shadow: 0 1px 0 rgba(0,0,0,.02); }
+    .pill { font-size: 12px; border: 1px solid #e6e8ee; border-radius: 999px; padding: 6px 10px; background: #fff; }
+
     .list { display: grid; gap: 10px; margin-top: 12px; }
     .row {
       display: grid;
@@ -36,13 +37,25 @@
     .due { color: #b00020; border-color: #ffd3da; background: #fff5f6; }
     .ok { color: #116b2f; border-color: #cfe9d8; background: #f3fbf6; }
     .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
-    .pill { font-size: 12px; border: 1px solid #e6e8ee; border-radius: 999px; padding: 6px 10px; background: #fff; }
-    input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 14px; }
-    label { font-size: 12px; color: #333; font-weight: 900; display: block; margin: 10px 0 6px; }
 
     .chk-wrap { display: flex; justify-content: center; padding-top: 6px; }
     input[type="checkbox"] { width: 22px; height: 22px; }
 
+    /* Top due banner */
+    .due-banner {
+      background: #fff5f6;
+      border: 1px solid #ffd3da;
+      color: #b00020;
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+    .due-banner .t { font-weight: 1000; }
+    .due-banner ul { margin: 8px 0 0 18px; padding: 0; }
+    .due-banner li { margin: 4px 0; }
+    .small { font-size: 12px; opacity: .9; }
+
+    /* Bottom fixed bar */
     .bottom-bar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
@@ -50,7 +63,7 @@
       backdrop-filter: blur(6px);
       border-top: 1px solid #e6e8ee;
       padding: 10px 12px;
-      z-index: 3;
+      z-index: 4;
     }
     .bottom-inner {
       max-width: 980px;
@@ -75,8 +88,9 @@
     .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; background: #fff; }
     .hist-item .t { font-weight: 900; }
     .hist-item .s { font-size: 12px; color: #555; margin-top: 2px; }
-    .small { font-size: 12px; color: #555; }
-    pre { white-space: pre-wrap; word-break: break-word; background:#f3f4f7; border:1px solid #e6e8ee; padding:10px; border-radius:12px; }
+
+    input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 14px; }
+    label { font-size: 12px; color: #333; font-weight: 900; display: block; margin: 10px 0 6px; }
   </style>
 </head>
 <body>
@@ -90,21 +104,7 @@
 </header>
 
 <main>
-  <div class="card">
-    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <input id="search" type="text" placeholder="Recherche description…" />
-      <select id="filter">
-        <option value="all">Tous</option>
-        <option value="due">DU seulement</option>
-      </select>
-      <select id="sort">
-        <option value="dueFirst">Tri: DU d’abord</option>
-        <option value="name">Tri: Nom</option>
-        <option value="next">Tri: Prochaine date</option>
-      </select>
-    </div>
-  </div>
-
+  <div id="dueBanner" class="due-banner hidden" role="alert"></div>
   <div class="list" id="list"></div>
 </main>
 
@@ -169,7 +169,7 @@
     </div>
 
     <div class="small" style="margin-top:12px;">
-      Astuce : tu peux utiliser Export/Import JSON pour sauvegarder ou restaurer tes données.
+      Astuce : Export/Import JSON te permet de sauvegarder ou restaurer tes données.
     </div>
   </div>
   <div class="modal-foot">
@@ -183,10 +183,7 @@
   // ===== Utils =====
   const pad2 = n => String(n).padStart(2, "0");
   const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  const fromYMD = (s) => {
-    const [y,m,d] = s.split("-").map(Number);
-    return new Date(y, m-1, d, 0,0,0,0);
-  };
+  const fromYMD = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d, 0,0,0,0); };
   const startOfToday = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
   const daysBetween = (a, b) => Math.floor((b.getTime() - a.getTime()) / 86400000);
   const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
@@ -203,6 +200,7 @@
       const req = indexedDB.open(DB_NAME, DB_VER);
       req.onupgradeneeded = () => {
         const db = req.result;
+
         const items = db.createObjectStore("items", { keyPath: "id" });
         items.createIndex("by_desc", "description", { unique: false });
 
@@ -322,9 +320,8 @@
   // ===== UI refs =====
   const elList = document.querySelector("#list");
   const elStats = document.querySelector("#stats");
-  const elSearch = document.querySelector("#search");
-  const elFilter = document.querySelector("#filter");
-  const elSort = document.querySelector("#sort");
+  const dueBanner = document.querySelector("#dueBanner");
+
   const pendingInfo = document.querySelector("#pendingInfo");
   const btnSaveChecks = document.querySelector("#btnSaveChecks");
   const btnClearChecks = document.querySelector("#btnClearChecks");
@@ -427,11 +424,13 @@
     if (pending.size === 0) return;
 
     const { count, text } = buildConfirmationList();
-    const ok = confirm(`Enregistrer "Fait" pour ${count} item(s) ?\n\n${text}\n\nÇa réinitialise leur prochaine date selon l’intervalle.`);
+    const ok = confirm(
+      `Enregistrer "Fait" pour ${count} item(s) ?\n\n${text}\n\n` +
+      `Ça réinitialise leur prochaine date selon l’intervalle.`
+    );
     if (!ok) return;
 
     const now = Date.now();
-    // 1 check entry per item
     for (const itemId of pending) {
       const id = await nextId();
       await put("checks", { id, itemId, dateCheck: now });
@@ -448,12 +447,35 @@
     render();
   }
 
-  async function render() {
-    const q = elSearch.value.trim().toLowerCase();
-    const filter = elFilter.value;
-    const sort = elSort.value;
+  function renderDueBanner(dueRows) {
+    if (!dueRows.length) {
+      dueBanner.classList.add("hidden");
+      dueBanner.innerHTML = "";
+      return;
+    }
 
+    // sort by dueDate (oldest due first)
+    dueRows.sort((a,b)=>a.st.dueDate - b.st.dueDate);
+
+    const itemsHtml = dueRows.slice(0, 20).map(r => {
+      const dueYMD = toYMD(r.st.dueDate);
+      return `<li><strong>${escapeHtml(r.item.description)}</strong> — dû le <strong>${dueYMD}</strong> (retard: ${r.st.daysDue} j)</li>`;
+    }).join("");
+
+    const more = dueRows.length - Math.min(20, dueRows.length);
+    const moreHtml = more > 0 ? `<div class="small" style="margin-top:8px;">… et ${more} autre(s) élément(s) dû(s).</div>` : "";
+
+    dueBanner.innerHTML = `
+      <div class="t">⚠️ Entretien(s) dû(s) (${dueRows.length})</div>
+      <ul>${itemsHtml}</ul>
+      ${moreHtml}
+    `;
+    dueBanner.classList.remove("hidden");
+  }
+
+  async function render() {
     const items = await getAll("items");
+
     const computed = [];
     for (const it of items) {
       const st = await computeStatus(it);
@@ -461,26 +483,21 @@
       computed.push({ item: it, st });
     }
 
-    let rows = computed.filter(({item, st}) => {
-      if (q && !item.description.toLowerCase().includes(q)) return false;
-      if (filter === "due" && !st.isDue) return false;
-      return true;
-    });
-
-    rows.sort((a,b) => {
-      if (sort === "name") return a.item.description.localeCompare(b.item.description, "fr");
-      if (sort === "next") return a.st.dueDate - b.st.dueDate;
+    // Default display: DU first, then nearest dueDate
+    computed.sort((a,b) => {
       if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
       return a.st.dueDate - b.st.dueDate;
     });
 
-    currentRows = rows;
+    currentRows = computed;
 
-    const dueCount = rows.filter(r => r.st.isDue).length;
-    elStats.textContent = `${rows.length} item(s) • ${dueCount} DU`;
+    const dueRows = computed.filter(r => r.st.isDue);
+    renderDueBanner(dueRows);
+
+    elStats.textContent = `${computed.length} item(s) • ${dueRows.length} DU`;
 
     elList.innerHTML = "";
-    rows.forEach(({item, st}, idx) => {
+    computed.forEach(({item, st}, idx) => {
       const nextYMD = toYMD(st.dueDate);
       const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
 
@@ -536,8 +553,8 @@
       elList.appendChild(row);
     });
 
-    if (rows.length === 0) selectedRowIndex = -1;
-    else if (selectedRowIndex >= rows.length) selectedRowIndex = rows.length - 1;
+    if (computed.length === 0) selectedRowIndex = -1;
+    else if (selectedRowIndex >= computed.length) selectedRowIndex = computed.length - 1;
     if (selectedRowIndex >= 0) selectRow(selectedRowIndex);
 
     updatePendingInfo();
@@ -570,11 +587,6 @@
       chk.dispatchEvent(new Event("change"));
     }
   });
-
-  // Search/filter/sort triggers
-  [elSearch, elFilter, elSort].forEach(el => el.addEventListener("input", render));
-  elFilter.addEventListener("change", render);
-  elSort.addEventListener("change", render);
 
   // Buttons
   document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
@@ -616,17 +628,13 @@
 
   async function onImportFileChosen() {
     const file = fileInput.files?.[0];
-    fileInput.value = ""; // allow reimport same file later
+    fileInput.value = "";
     if (!file) return;
 
     const text = await file.text();
     let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      alert("Fichier JSON invalide.");
-      return;
-    }
+    try { json = JSON.parse(text); }
+    catch { alert("Fichier JSON invalide."); return; }
 
     if (!json || json.app !== "Entretien" || !json.data) {
       alert("Ce JSON ne semble pas être un backup Entretien.");
@@ -638,33 +646,20 @@
     const alerts = json.data.alerts || [];
 
     const ok = confirm(
-      `Importer backup ?\n\n` +
-      `Items: ${items.length}\nChecks: ${checks.length}\nAlertes: ${alerts.length}\n\n` +
-      `⚠️ Choisir OK pour REMPLACER toutes les données actuelles par ce backup.`
+      `Importer backup ?\n\nItems: ${items.length}\nChecks: ${checks.length}\nAlertes: ${alerts.length}\n\n` +
+      `⚠️ OK = REMPLACER toutes les données actuelles.`
     );
     if (!ok) return;
 
-    // Replace all
     await clearAllData();
-
-    // Reinsert
     for (const it of items) await put("items", it);
     for (const c of checks) await put("checks", c);
     for (const a of alerts) await put("alerts", a);
 
-    // Fix seed to max id + 1
-    const maxId = Math.max(
-      0,
-      ...items.map(x => x.id||0),
-      ...checks.map(x => x.id||0),
-      ...alerts.map(x => x.id||0)
-    );
+    const maxId = Math.max(0, ...items.map(x => x.id||0), ...checks.map(x => x.id||0), ...alerts.map(x => x.id||0));
     const { t, stores } = tx(["meta"], "readwrite");
     stores.meta.put({ key: "seed", value: maxId + 1 });
-    await new Promise((resolve, reject) => {
-      t.oncomplete = resolve;
-      t.onerror = () => reject(t.error);
-    });
+    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
 
     pending.clear();
     updatePendingInfo();
@@ -802,10 +797,10 @@
     await render();
   });
 
-  // ===== Auto refresh =====
+  // Auto refresh
   setInterval(render, 5 * 60 * 1000);
 
-  // ===== Init =====
+  // Init
   (async function init() {
     db = await openDB();
     updatePendingInfo();
