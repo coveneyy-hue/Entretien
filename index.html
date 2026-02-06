@@ -7,46 +7,63 @@
   <style>
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     body { margin: 0; background: #f6f7f9; color: #111; }
-    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; }
+    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 2; }
     h1 { margin: 0; font-size: 18px; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 600; }
+    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 110px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+    button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
     button.primary { background: #111; color: #fff; border-color: #111; }
     button.danger { border-color: #ffced0; }
     button:active { transform: scale(0.99); }
+    button[disabled]{ opacity:.55; }
     .card { background: #fff; border: 1px solid #e6e8ee; border-radius: 14px; padding: 10px; box-shadow: 0 1px 0 rgba(0,0,0,.02); }
     .list { display: grid; gap: 10px; margin-top: 12px; }
-
     .row {
       display: grid;
-      grid-template-columns: 46px 1fr auto;
+      grid-template-columns: 44px 1fr auto;
       gap: 10px;
-      align-items: center;
+      align-items: start;
       padding: 10px;
       border: 1px solid #eef0f6;
       border-radius: 12px;
+      background: #fff;
     }
     .row.selected { outline: 2px solid #111; }
-    .desc {
-      font-weight: 700;
-      user-select: text;
-      -webkit-user-select: text;
-      cursor: default;
-      max-width: 60ch;
-      word-break: break-word;
-    }
-    .meta { font-size: 12px; color: #555; margin-top: 2px; }
-    .status { font-size: 12px; font-weight: 800; padding: 6px 8px; border-radius: 999px; border: 1px solid #eee; }
+    .desc { font-weight: 900; user-select: text; -webkit-user-select: text; cursor: default; }
+    .meta { font-size: 12px; color: #555; margin-top: 6px; display: grid; gap: 2px; }
+    .cols { font-size: 12px; color: #333; display: grid; gap: 2px; }
+    .status { font-size: 12px; font-weight: 900; padding: 6px 8px; border-radius: 999px; border: 1px solid #eee; white-space: nowrap; }
     .due { color: #b00020; border-color: #ffd3da; background: #fff5f6; }
     .ok { color: #116b2f; border-color: #cfe9d8; background: #f3fbf6; }
-    .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
-    .thumb { font-size: 18px; padding: 8px 10px; border-radius: 12px; }
+    .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
     .pill { font-size: 12px; border: 1px solid #e6e8ee; border-radius: 999px; padding: 6px 10px; background: #fff; }
-    input, select { width: 100%; padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 14px; }
-    label { font-size: 12px; color: #333; font-weight: 700; display: block; margin: 10px 0 6px; }
+    input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 14px; }
+    label { font-size: 12px; color: #333; font-weight: 900; display: block; margin: 10px 0 6px; }
 
-    dialog { width: min(520px, 92vw); border: 1px solid #e6e8ee; border-radius: 14px; padding: 0; }
+    .chk-wrap { display: flex; justify-content: center; padding-top: 6px; }
+    input[type="checkbox"] { width: 22px; height: 22px; }
+
+    .bottom-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(6px);
+      border-top: 1px solid #e6e8ee;
+      padding: 10px 12px;
+      z-index: 3;
+    }
+    .bottom-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .bottom-actions { display:flex; gap:8px; flex-wrap: wrap; justify-content:flex-end; }
+
+    dialog { width: min(560px, 94vw); border: 1px solid #e6e8ee; border-radius: 14px; padding: 0; }
     dialog::backdrop { background: rgba(0,0,0,.35); }
     .modal-head { padding: 12px 14px; border-bottom: 1px solid #eef0f6; display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: 12px 14px; }
@@ -55,9 +72,11 @@
     .tabs { display: flex; gap: 8px; margin-top: 10px; }
     .tabs button { flex: 1; }
     .hidden { display: none; }
-    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; }
-    .hist-item .t { font-weight: 800; }
+    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; background: #fff; }
+    .hist-item .t { font-weight: 900; }
     .hist-item .s { font-size: 12px; color: #555; margin-top: 2px; }
+    .small { font-size: 12px; color: #555; }
+    pre { white-space: pre-wrap; word-break: break-word; background:#f3f4f7; border:1px solid #e6e8ee; padding:10px; border-radius:12px; }
   </style>
 </head>
 <body>
@@ -65,7 +84,7 @@
   <h1>Entretien</h1>
   <div class="toolbar">
     <button class="primary" id="btnAdd">+ Ajouter</button>
-    <button id="btnHistory">Historique</button>
+    <button id="btnHistory">Journal</button>
     <span class="pill" id="stats">—</span>
   </div>
 </header>
@@ -73,7 +92,7 @@
 <main>
   <div class="card">
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <input id="search" placeholder="Recherche description…" />
+      <input id="search" type="text" placeholder="Recherche description…" />
       <select id="filter">
         <option value="all">Tous</option>
         <option value="due">DU seulement</option>
@@ -81,13 +100,27 @@
       <select id="sort">
         <option value="dueFirst">Tri: DU d’abord</option>
         <option value="name">Tri: Nom</option>
-        <option value="next">Tri: Prochaine échéance</option>
+        <option value="next">Tri: Prochaine date</option>
       </select>
     </div>
   </div>
 
   <div class="list" id="list"></div>
 </main>
+
+<!-- Bottom fixed bar -->
+<div class="bottom-bar">
+  <div class="bottom-inner">
+    <div class="pill" id="pendingInfo">0 sélectionné(s) à enregistrer</div>
+    <div class="bottom-actions">
+      <button id="btnExport">Export JSON</button>
+      <button id="btnImport">Import JSON</button>
+      <button id="btnClearChecks">Réinitialiser checks</button>
+      <button class="primary" id="btnSaveChecks" disabled>Enregistrer</button>
+    </div>
+  </div>
+  <input id="fileInput" type="file" accept="application/json,.json" class="hidden" />
+</div>
 
 <!-- Modal Ajout/Modification -->
 <dialog id="dlgEdit">
@@ -101,7 +134,7 @@
       <input id="fDesc" maxlength="50" placeholder="Ex: Changer filtre fournaise" />
     </label>
 
-    <label>Date début
+    <label>Date de début
       <input id="fStart" type="date" />
     </label>
 
@@ -112,14 +145,14 @@
   <div class="modal-foot">
     <button id="btnDelete" class="danger hidden">Supprimer</button>
     <button id="btnCancel">Annuler</button>
-    <button id="btnSave" class="primary">Enregistrer</button>
+    <button id="btnSave" class="primary">Enregistrer l’item</button>
   </div>
 </dialog>
 
-<!-- Modal Historique regroupé -->
+<!-- Modal Journal -->
 <dialog id="dlgHistory">
   <div class="modal-head">
-    <strong>Historique</strong>
+    <strong>Journal (Historique)</strong>
     <button id="btnCloseHist" aria-label="Fermer">✕</button>
   </div>
   <div class="modal-body">
@@ -134,37 +167,31 @@
       <select id="histItemSelect"></select>
       <div id="histItemEvents" style="margin-top:10px; display:grid; gap:10px;"></div>
     </div>
+
+    <div class="small" style="margin-top:12px;">
+      Astuce : tu peux utiliser Export/Import JSON pour sauvegarder ou restaurer tes données.
+    </div>
   </div>
   <div class="modal-foot">
-    <button id="btnClearHist" class="danger">Vider l’historique</button>
+    <button id="btnClearHist" class="danger">Vider le journal</button>
     <button id="btnCloseHist2" class="primary">OK</button>
   </div>
 </dialog>
 
 <script>
 (() => {
-  // ===== Utils dates =====
+  // ===== Utils =====
   const pad2 = n => String(n).padStart(2, "0");
   const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
   const fromYMD = (s) => {
-    // s: YYYY-MM-DD
     const [y,m,d] = s.split("-").map(Number);
     return new Date(y, m-1, d, 0,0,0,0);
   };
-  const startOfToday = () => {
-    const d = new Date();
-    d.setHours(0,0,0,0);
-    return d;
-  };
-  const daysBetween = (a, b) => { // b - a in full days
-    const ms = b.getTime() - a.getTime();
-    return Math.floor(ms / 86400000);
-  };
+  const startOfToday = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+  const daysBetween = (a, b) => Math.floor((b.getTime() - a.getTime()) / 86400000);
   const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
-  const fmtDT = (ts) => {
-    const d = new Date(ts);
-    return d.toLocaleString("fr-CA", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
-  };
+  const fmtDT = (ts) => new Date(ts).toLocaleString("fr-CA", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+  const escapeHtml = (s) => s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
 
   // ===== IndexedDB =====
   const DB_NAME = "EntretienDB";
@@ -174,9 +201,8 @@
   function openDB() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VER);
-      req.onupgradeneeded = (e) => {
+      req.onupgradeneeded = () => {
         const db = req.result;
-
         const items = db.createObjectStore("items", { keyPath: "id" });
         items.createIndex("by_desc", "description", { unique: false });
 
@@ -186,7 +212,7 @@
 
         const alerts = db.createObjectStore("alerts", { keyPath: "id" });
         alerts.createIndex("by_item", "itemId", { unique: false });
-        alerts.createIndex("by_dueKey", "dueKey", { unique: false }); // itemId|dueYMD
+        alerts.createIndex("by_dueKey", "dueKey", { unique: false });
         alerts.createIndex("by_ts", "dateAlert", { unique: false });
 
         const meta = db.createObjectStore("meta", { keyPath: "key" });
@@ -234,17 +260,7 @@
     });
   }
 
-  function del(storeName, key) {
-    return new Promise((resolve, reject) => {
-      const { t, stores } = tx([storeName], "readwrite");
-      stores[storeName].delete(key);
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-    });
-  }
-
   async function deleteItemCascade(itemId) {
-    // delete item + related checks + alerts
     const checks = await getAll("checks", "by_item", itemId);
     const alerts = await getAll("alerts", "by_item", itemId);
 
@@ -255,6 +271,17 @@
 
     return await new Promise((resolve, reject) => {
       t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  async function clearAllData() {
+    const { t, stores } = tx(["items","checks","alerts"], "readwrite");
+    stores.items.clear();
+    stores.checks.clear();
+    stores.alerts.clear();
+    return await new Promise((resolve, reject) => {
+      t.oncomplete = resolve;
       t.onerror = () => reject(t.error);
     });
   }
@@ -276,36 +303,35 @@
     const dueDate = addDays(ref, Number(item.intervalJours));
     dueDate.setHours(0,0,0,0);
 
-    const daysDue = Math.max(0, daysBetween(dueDate, today)); // today - dueDate
+    const daysDue = Math.max(0, daysBetween(dueDate, today));
     const isDue = today.getTime() >= dueDate.getTime();
-    return { lastTs: last, refDate: ref, dueDate, isDue, daysDue };
+    return { lastTs: last, dueDate, isDue, daysDue };
   }
 
   async function ensureAlertLogged(item, status) {
     if (!status.isDue) return;
     const dueYMD = toYMD(status.dueDate);
     const dueKey = `${item.id}|${dueYMD}`;
-
-    // If already logged for this dueKey, do nothing
     const all = await getAll("alerts");
     if (all.some(a => a.dueKey === dueKey)) return;
 
     const id = await nextId();
-    await put("alerts", {
-      id,
-      itemId: item.id,
-      dueKey,
-      dueDateYMD: dueYMD,
-      dateAlert: Date.now()
-    });
+    await put("alerts", { id, itemId: item.id, dueKey, dueDateYMD: dueYMD, dateAlert: Date.now() });
   }
 
-  // ===== UI =====
+  // ===== UI refs =====
   const elList = document.querySelector("#list");
   const elStats = document.querySelector("#stats");
   const elSearch = document.querySelector("#search");
   const elFilter = document.querySelector("#filter");
   const elSort = document.querySelector("#sort");
+  const pendingInfo = document.querySelector("#pendingInfo");
+  const btnSaveChecks = document.querySelector("#btnSaveChecks");
+  const btnClearChecks = document.querySelector("#btnClearChecks");
+
+  const btnExport = document.querySelector("#btnExport");
+  const btnImport = document.querySelector("#btnImport");
+  const fileInput = document.querySelector("#fileInput");
 
   // Edit modal
   const dlgEdit = document.querySelector("#dlgEdit");
@@ -320,19 +346,19 @@
   const dlgHistory = document.querySelector("#dlgHistory");
   const viewGlobal = document.querySelector("#viewGlobal");
   const viewByItem = document.querySelector("#viewByItem");
-  const viewGlobalBox = document.querySelector("#viewGlobal");
   const histItemSelect = document.querySelector("#histItemSelect");
   const histItemEvents = document.querySelector("#histItemEvents");
   const tabGlobal = document.querySelector("#tabGlobal");
   const tabByItem = document.querySelector("#tabByItem");
 
   let selectedRowIndex = -1;
-  let currentItems = [];
+  let currentRows = []; // [{item, st}]
   let editingId = null;
 
-  function setDescCount() {
-    descCount.textContent = `${fDesc.value.length}/50`;
-  }
+  // Batch selection (checkboxes)
+  const pending = new Set();
+
+  function setDescCount() { descCount.textContent = `${fDesc.value.length}/50`; }
   fDesc.addEventListener("input", setDescCount);
 
   function openEdit(item=null) {
@@ -342,12 +368,10 @@
     fStart.value = item ? item.dateDebut : toYMD(startOfToday());
     fInt.value = item ? item.intervalJours : "30";
     setDescCount();
-
     btnDelete.classList.toggle("hidden", !item);
     dlgEdit.showModal();
     setTimeout(()=>fDesc.focus(), 50);
   }
-
   function closeEdit() { dlgEdit.close(); }
 
   async function saveEdit() {
@@ -355,7 +379,7 @@
     if (!description) return alert("Description requise.");
     if (description.length > 50) return alert("Max 50 caractères.");
     const dateDebut = fStart.value;
-    if (!dateDebut) return alert("Date début requise.");
+    if (!dateDebut) return alert("Date de début requise.");
     const intervalJours = Number(fInt.value);
     if (!Number.isFinite(intervalJours) || intervalJours < 1) return alert("Intervalle (jours) doit être >= 1.");
 
@@ -371,30 +395,57 @@
 
   async function doDelete() {
     if (editingId == null) return;
-    const ok = confirm("Supprimer cet entretien (et son historique) ?");
+    const ok = confirm("Supprimer cet item (et son journal) ?");
     if (!ok) return;
     await deleteItemCascade(editingId);
+    pending.delete(editingId);
     closeEdit();
-    await render();
-  }
-
-  async function markDone(itemId) {
-    const item = currentItems.find(x => x.id === itemId);
-    if (!item) return;
-
-    const ok = confirm(`Confirmer "Fait" pour :\n\n${item.description}`);
-    if (!ok) return;
-
-    const id = await nextId();
-    await put("checks", { id, itemId, dateCheck: Date.now() });
     await render();
   }
 
   function selectRow(i) {
     selectedRowIndex = i;
-    [...elList.querySelectorAll(".row")].forEach((r, idx) => {
-      r.classList.toggle("selected", idx === i);
-    });
+    [...elList.querySelectorAll(".row")].forEach((r, idx) => r.classList.toggle("selected", idx === i));
+  }
+
+  function updatePendingInfo() {
+    pendingInfo.textContent = `${pending.size} sélectionné(s) à enregistrer`;
+    btnSaveChecks.disabled = pending.size === 0;
+  }
+
+  function buildConfirmationList() {
+    const selected = currentRows.filter(r => pending.has(r.item.id)).map(r => r.item.description);
+    selected.sort((a,b)=>a.localeCompare(b,"fr"));
+    const preview = selected.slice(0, 10);
+    const more = selected.length - preview.length;
+    const lines = preview.map(s => `• ${s}`);
+    if (more > 0) lines.push(`• … et ${more} autre(s)`);
+    return { count: selected.length, text: lines.join("\n") };
+  }
+
+  async function savePendingChecks() {
+    if (pending.size === 0) return;
+
+    const { count, text } = buildConfirmationList();
+    const ok = confirm(`Enregistrer "Fait" pour ${count} item(s) ?\n\n${text}\n\nÇa réinitialise leur prochaine date selon l’intervalle.`);
+    if (!ok) return;
+
+    const now = Date.now();
+    // 1 check entry per item
+    for (const itemId of pending) {
+      const id = await nextId();
+      await put("checks", { id, itemId, dateCheck: now });
+    }
+
+    pending.clear();
+    updatePendingInfo();
+    await render();
+  }
+
+  function clearPendingChecksUIOnly() {
+    pending.clear();
+    updatePendingInfo();
+    render();
   }
 
   async function render() {
@@ -403,110 +454,97 @@
     const sort = elSort.value;
 
     const items = await getAll("items");
-    // compute statuses
     const computed = [];
     for (const it of items) {
       const st = await computeStatus(it);
-      await ensureAlertLogged(it, st); // log alert once per due period
+      await ensureAlertLogged(it, st);
       computed.push({ item: it, st });
     }
 
-    // apply search/filter
     let rows = computed.filter(({item, st}) => {
       if (q && !item.description.toLowerCase().includes(q)) return false;
       if (filter === "due" && !st.isDue) return false;
       return true;
     });
 
-    // sort
     rows.sort((a,b) => {
       if (sort === "name") return a.item.description.localeCompare(b.item.description, "fr");
       if (sort === "next") return a.st.dueDate - b.st.dueDate;
-      // dueFirst
       if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
       return a.st.dueDate - b.st.dueDate;
     });
 
-    currentItems = rows.map(r => r.item);
+    currentRows = rows;
 
-    // stats
     const dueCount = rows.filter(r => r.st.isDue).length;
     elStats.textContent = `${rows.length} item(s) • ${dueCount} DU`;
 
-    // render list
     elList.innerHTML = "";
     rows.forEach(({item, st}, idx) => {
-      const dueBadge = st.isDue
-        ? `<span class="status due">DU (${st.daysDue} j)</span>`
-        : `<span class="status ok">OK</span>`;
-
       const nextYMD = toYMD(st.dueDate);
-      const lastTxt = st.lastTs ? fmtDT(st.lastTs) : "—";
+      const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
 
       const row = document.createElement("div");
       row.className = "row";
       row.tabIndex = 0;
-      row.dataset.idx = String(idx);
 
       row.innerHTML = `
-        <button class="thumb" title="Marquer comme fait">👍</button>
+        <div class="chk-wrap">
+          <input type="checkbox" aria-label="Check fait" ${pending.has(item.id) ? "checked" : ""}/>
+        </div>
         <div>
           <div class="desc">${escapeHtml(item.description)}</div>
           <div class="meta">
-            Début: ${item.dateDebut} • Intervalle: ${item.intervalJours} j • Prochaine: ${nextYMD} • Dernier fait: ${lastTxt}
+            <div class="cols">Date début: <strong>${item.dateDebut}</strong></div>
+            <div class="cols">Intervalle: <strong>${item.intervalJours}</strong> jour(s)</div>
+            <div class="cols">Prochaine date: <strong>${nextYMD}</strong></div>
           </div>
         </div>
         <div class="actions">
-          ${dueBadge}
+          ${badge}
           <button title="Modifier">✏️</button>
           <button class="danger" title="Supprimer">🗑️</button>
         </div>
       `;
 
-      // selection + pilotable
       row.addEventListener("click", (e) => {
+        if (e.target && e.target.tagName === "INPUT") return;
         selectRow(idx);
       });
 
-      // buttons
-      const btnThumb = row.querySelector(".thumb");
-      const btnEdit = row.querySelectorAll(".actions button")[1];
-      const btnDel  = row.querySelectorAll(".actions button")[2];
-
-      btnThumb.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await markDone(item.id);
+      const chk = row.querySelector('input[type="checkbox"]');
+      chk.addEventListener("change", () => {
+        if (chk.checked) pending.add(item.id);
+        else pending.delete(item.id);
+        updatePendingInfo();
       });
 
-      btnEdit.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openEdit(item);
-      });
+      const btnEdit = row.querySelectorAll(".actions button")[0];
+      const btnDel  = row.querySelectorAll(".actions button")[1];
 
+      btnEdit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(item); });
       btnDel.addEventListener("click", async (e) => {
         e.stopPropagation();
-        const ok = confirm(`Supprimer (et l’historique) :\n\n${item.description} ?`);
+        const ok = confirm(`Supprimer (et journal) :\n\n${item.description} ?`);
         if (!ok) return;
         await deleteItemCascade(item.id);
+        pending.delete(item.id);
+        updatePendingInfo();
         await render();
       });
 
       elList.appendChild(row);
     });
 
-    // keep selection valid
     if (rows.length === 0) selectedRowIndex = -1;
     else if (selectedRowIndex >= rows.length) selectedRowIndex = rows.length - 1;
     if (selectedRowIndex >= 0) selectRow(selectedRowIndex);
-  }
 
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+    updatePendingInfo();
   }
 
   // Keyboard navigation
-  document.addEventListener("keydown", async (e) => {
-    // avoid when dialogs open
+  document.addEventListener("keydown", (e) => {
     if (dlgEdit.open || dlgHistory.open) return;
     const rows = [...elList.querySelectorAll(".row")];
     if (!rows.length) return;
@@ -521,12 +559,15 @@
       selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = currentItems[selectedRowIndex];
-      if (item) openEdit(item);
+      const cur = currentRows[selectedRowIndex];
+      if (cur) openEdit(cur.item);
     } else if (e.key === " ") {
       e.preventDefault();
-      const item = currentItems[selectedRowIndex];
-      if (item) await markDone(item.id);
+      const row = rows[selectedRowIndex];
+      if (!row) return;
+      const chk = row.querySelector('input[type="checkbox"]');
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event("change"));
     }
   });
 
@@ -542,7 +583,96 @@
   document.querySelector("#btnSave").addEventListener("click", saveEdit);
   document.querySelector("#btnDelete").addEventListener("click", doDelete);
 
-  // History
+  btnSaveChecks.addEventListener("click", savePendingChecks);
+  btnClearChecks.addEventListener("click", clearPendingChecksUIOnly);
+
+  // ===== Export / Import JSON =====
+  btnExport.addEventListener("click", exportJSON);
+  btnImport.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", onImportFileChosen);
+
+  async function exportJSON() {
+    const items = await getAll("items");
+    const checks = await getAll("checks");
+    const alerts = await getAll("alerts");
+
+    const payload = {
+      app: "Entretien",
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: { items, checks, alerts }
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entretien-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function onImportFileChosen() {
+    const file = fileInput.files?.[0];
+    fileInput.value = ""; // allow reimport same file later
+    if (!file) return;
+
+    const text = await file.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      alert("Fichier JSON invalide.");
+      return;
+    }
+
+    if (!json || json.app !== "Entretien" || !json.data) {
+      alert("Ce JSON ne semble pas être un backup Entretien.");
+      return;
+    }
+
+    const items = json.data.items || [];
+    const checks = json.data.checks || [];
+    const alerts = json.data.alerts || [];
+
+    const ok = confirm(
+      `Importer backup ?\n\n` +
+      `Items: ${items.length}\nChecks: ${checks.length}\nAlertes: ${alerts.length}\n\n` +
+      `⚠️ Choisir OK pour REMPLACER toutes les données actuelles par ce backup.`
+    );
+    if (!ok) return;
+
+    // Replace all
+    await clearAllData();
+
+    // Reinsert
+    for (const it of items) await put("items", it);
+    for (const c of checks) await put("checks", c);
+    for (const a of alerts) await put("alerts", a);
+
+    // Fix seed to max id + 1
+    const maxId = Math.max(
+      0,
+      ...items.map(x => x.id||0),
+      ...checks.map(x => x.id||0),
+      ...alerts.map(x => x.id||0)
+    );
+    const { t, stores } = tx(["meta"], "readwrite");
+    stores.meta.put({ key: "seed", value: maxId + 1 });
+    await new Promise((resolve, reject) => {
+      t.oncomplete = resolve;
+      t.onerror = () => reject(t.error);
+    });
+
+    pending.clear();
+    updatePendingInfo();
+    await render();
+    alert("Import terminé ✅");
+  }
+
+  // ===== Journal (History) =====
   document.querySelector("#btnHistory").addEventListener("click", openHistory);
   document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
   document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
@@ -550,19 +680,19 @@
   tabGlobal.addEventListener("click", () => setHistTab("global"));
   tabByItem.addEventListener("click", () => setHistTab("item"));
 
-  async function openHistory() {
-    await renderHistoryGlobal();
-    await renderHistoryItemPicker();
-    setHistTab("global");
-    dlgHistory.showModal();
-  }
-
   function setHistTab(which) {
     const isGlobal = which === "global";
     viewGlobal.classList.toggle("hidden", !isGlobal);
     viewByItem.classList.toggle("hidden", isGlobal);
     tabGlobal.classList.toggle("primary", isGlobal);
     tabByItem.classList.toggle("primary", !isGlobal);
+  }
+
+  async function openHistory() {
+    await renderHistoryGlobal();
+    await renderHistoryItemPicker();
+    setHistTab("global");
+    dlgHistory.showModal();
   }
 
   async function renderHistoryGlobal() {
@@ -573,31 +703,19 @@
     const alerts = await getAll("alerts");
 
     const events = [];
-
-    checks.forEach(c => events.push({
-      type: "done",
-      ts: c.dateCheck,
-      itemId: c.itemId,
-      extra: null
-    }));
+    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck, itemId:c.itemId }));
 
     alerts.forEach(a => {
-      // days due at alert time
       const dueDate = fromYMD(a.dueDateYMD);
       const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
       const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
-      events.push({
-        type: "alert",
-        ts: a.dateAlert,
-        itemId: a.itemId,
-        extra: { dueDateYMD: a.dueDateYMD, daysDue }
-      });
+      events.push({ type:"alert", ts:a.dateAlert, itemId:a.itemId, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
     });
 
-    events.sort((a,b) => b.ts - a.ts);
+    events.sort((a,b)=>b.ts - a.ts);
 
-    viewGlobalBox.innerHTML = events.length ? "" : `<div class="hist-item">Aucun historique.</div>`;
-    for (const ev of events.slice(0, 200)) {
+    viewGlobal.innerHTML = events.length ? "" : `<div class="hist-item">Aucun journal.</div>`;
+    for (const ev of events.slice(0, 300)) {
       const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
       const box = document.createElement("div");
       box.className = "hist-item";
@@ -607,7 +725,7 @@
         box.innerHTML = `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
                          <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
       }
-      viewGlobalBox.appendChild(box);
+      viewGlobal.appendChild(box);
     }
   }
 
@@ -620,7 +738,7 @@
       opt.textContent = it.description;
       histItemSelect.appendChild(opt);
     });
-    histItemSelect.addEventListener("change", renderHistoryForSelectedItem);
+    histItemSelect.onchange = renderHistoryForSelectedItem;
     await renderHistoryForSelectedItem();
   }
 
@@ -656,7 +774,7 @@
       return;
     }
 
-    for (const ev of events.slice(0, 200)) {
+    for (const ev of events.slice(0, 300)) {
       const box = document.createElement("div");
       box.className = "hist-item";
       if (ev.type === "done") {
@@ -670,28 +788,27 @@
   }
 
   document.querySelector("#btnClearHist").addEventListener("click", async () => {
-    const ok = confirm("Vider tout l’historique (Fait + Alertes) ? Les items restent.");
+    const ok = confirm("Vider tout le journal (Fait + Alertes) ? Les items restent.");
     if (!ok) return;
 
-    // Clear stores checks & alerts
     const { t, stores } = tx(["checks","alerts"], "readwrite");
     stores.checks.clear();
     stores.alerts.clear();
-    await new Promise((resolve, reject) => {
-      t.oncomplete = resolve;
-      t.onerror = () => reject(t.error);
-    });
+    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
 
+    pending.clear();
+    updatePendingInfo();
     await renderHistoryGlobal();
     await render();
   });
 
-  // Auto refresh every 5 min
+  // ===== Auto refresh =====
   setInterval(render, 5 * 60 * 1000);
 
-  // Init
+  // ===== Init =====
   (async function init() {
     db = await openDB();
+    updatePendingInfo();
     await render();
   })();
 
