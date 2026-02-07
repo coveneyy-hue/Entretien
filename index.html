@@ -9,7 +9,7 @@
     body { margin: 0; background: #f6f7f9; color: #111; }
     header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 3; }
     h1 { margin: 0; font-size: 18px; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 86px; } /* reduced for shorter bottom bar */
+    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 86px; } /* shorter bottom bar */
 
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
     button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
@@ -154,7 +154,6 @@
   <div class="bottom-inner">
     <div class="pill" id="pendingInfo">0 sélectionné(s) à enregistrer</div>
     <div class="bottom-actions">
-      <!-- tooltips via title -->
       <button class="icon-btn" id="btnExport" title="Export JSON"><span class="icon">⬆️</span></button>
       <button class="icon-btn" id="btnImport" title="Import JSON"><span class="icon">⬇️</span></button>
       <button class="icon-btn" id="btnClearChecks" title="Réinitialiser sélection"><span class="icon">🧹</span></button>
@@ -179,6 +178,11 @@
     <label>
       Nombre d’itérations (Fait)
       <input id="fIter" type="number" disabled value="0" />
+    </label>
+
+    <label>
+      Dernier entretien
+      <input id="fDernier" type="date" disabled />
     </label>
 
     <label>Date de début
@@ -353,15 +357,23 @@
   async function computeStatus(item) {
     const today = startOfToday();
     const last = await lastCheckTs(item.id);
-    const ref = last ? new Date(last) : fromYMD(item.dateDebut);
-    ref.setHours(0,0,0,0);
 
-    const dueDate = addDays(ref, Number(item.intervalJours));
+    const refDate = last ? new Date(last) : fromYMD(item.dateDebut);
+    refDate.setHours(0,0,0,0);
+
+    const dueDate = addDays(refDate, Number(item.intervalJours));
     dueDate.setHours(0,0,0,0);
 
     const daysDue = Math.max(0, daysBetween(dueDate, today));
     const isDue = today.getTime() >= dueDate.getTime();
-    return { lastTs: last, dueDate, isDue, daysDue };
+
+    return {
+      lastTs: last,
+      refYMD: toYMD(refDate),     // <-- "Dernier entretien" (ou date début si aucun fait)
+      dueDate,
+      isDue,
+      daysDue
+    };
   }
 
   async function ensureAlertLogged(item, status) {
@@ -393,6 +405,7 @@
   const dlgTitle = document.querySelector("#dlgTitle");
   const fDesc = document.querySelector("#fDesc");
   const fIter = document.querySelector("#fIter");
+  const fDernier = document.querySelector("#fDernier");
   const fStart = document.querySelector("#fStart");
   const fInt = document.querySelector("#fInt");
   const descCount = document.querySelector("#descCount");
@@ -404,8 +417,6 @@
   const viewByItem = document.querySelector("#viewByItem");
   const histItemSelect = document.querySelector("#histItemSelect");
   const histItemEvents = document.querySelector("#histItemEvents");
-  const tabGlobal = document.querySelector("#tabGlobal");
-  const tabByItem = document.querySelector("#tabByItem");
 
   let selectedRowIndex = -1;
   let currentRows = []; // [{item, st}]
@@ -417,7 +428,7 @@
   function setDescCount() { descCount.textContent = `${fDesc.value.length}/50`; }
   fDesc.addEventListener("input", setDescCount);
 
-  function openEdit(item=null) {
+  async function openEdit(item=null) {
     editingId = item ? item.id : null;
     dlgTitle.textContent = item ? "Modifier" : "Ajouter";
     fDesc.value = item ? item.description : "";
@@ -426,26 +437,31 @@
     setDescCount();
     btnDelete.classList.toggle("hidden", !item);
 
-    // itérations (lecture seule)
     if (!item) {
       fIter.value = 0;
+      fDernier.value = fStart.value; // aucun fait => date début
     } else {
-      getAll("checks", "by_item", item.id).then(list => {
-        fIter.value = list.length;
-      });
+      const checks = await getAll("checks", "by_item", item.id);
+      fIter.value = checks.length;
+
+      const last = await lastCheckTs(item.id);
+      fDernier.value = last ? toYMD(new Date(last)) : item.dateDebut;
     }
 
     dlgEdit.showModal();
     setTimeout(()=>fDesc.focus(), 50);
   }
+
   function closeEdit() { dlgEdit.close(); }
 
   async function saveEdit() {
     const description = fDesc.value.trim();
     if (!description) return alert("Description requise.");
     if (description.length > 50) return alert("Max 50 caractères.");
+
     const dateDebut = fStart.value;
     if (!dateDebut) return alert("Date de début requise.");
+
     const intervalJours = Number(fInt.value);
     if (!Number.isFinite(intervalJours) || intervalJours < 1) return alert("Intervalle (jours) doit être >= 1.");
 
@@ -469,6 +485,7 @@
           if (okReset) {
             await deleteChecksForItem(editingId);
             fIter.value = 0;
+            fDernier.value = dateDebut; // plus de fait => date début devient la référence
           }
         }
       }
@@ -529,12 +546,6 @@
     pending.clear();
     updatePendingInfo();
     await render();
-  }
-
-  function clearPendingChecksUIOnly() {
-    pending.clear();
-    updatePendingInfo();
-    render();
   }
 
   function renderDueBanner(dueRows) {
@@ -602,7 +613,7 @@
           <div class="desc">${escapeHtml(item.description)}</div>
           <div class="meta">
             <div class="meta-line">
-              <span><span class="k">Début:</span> <span class="v">${item.dateDebut}</span></span>
+              <span><span class="k">Dernier entretien:</span> <span class="v">${st.refYMD}</span></span>
               <span>•</span>
               <span><span class="k">Intervalle:</span> <span class="v">${item.intervalJours}</span> <span class="k">jour(s)</span></span>
               <span>•</span>
@@ -681,13 +692,14 @@
     }
   });
 
-  // Buttons
+  // Buttons - top
   document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
-  document.querySelector("#btnCloseEdit").addEventListener("click", () => dlgEdit.close());
-  document.querySelector("#btnCancel").addEventListener("click", () => dlgEdit.close());
+  document.querySelector("#btnCloseEdit").addEventListener("click", closeEdit);
+  document.querySelector("#btnCancel").addEventListener("click", closeEdit);
   document.querySelector("#btnSave").addEventListener("click", saveEdit);
   document.querySelector("#btnDelete").addEventListener("click", doDelete);
 
+  // Buttons - bottom
   btnSaveChecks.addEventListener("click", savePendingChecks);
   btnClearChecks.addEventListener("click", () => { pending.clear(); updatePendingInfo(); render(); });
 
