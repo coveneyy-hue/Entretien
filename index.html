@@ -548,4 +548,333 @@
     // DU first, then nearest dueDate
     computed.sort((a,b) => {
       if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
-      return a.st.dueDate - b.st.dueDat
+      return a.st.dueDate - b.st.dueDate;
+    });
+
+    currentRows = computed;
+
+    const dueRows = computed.filter(r => r.st.isDue);
+    renderDueBanner(dueRows);
+
+    elStats.textContent = `${computed.length} item(s) • ${dueRows.length} DU`;
+
+    elList.innerHTML = "";
+    computed.forEach(({item, st}, idx) => {
+      const nextYMD = toYMD(st.dueDate);
+      const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
+
+      row = document.createElement("div");
+      row.className = "row";
+      row.tabIndex = 0;
+
+      row.innerHTML = `
+        <div class="chk-wrap">
+          <input type="checkbox" aria-label="Check fait" ${pending.has(item.id) ? "checked" : ""}/>
+        </div>
+        <div>
+          <div class="desc">${escapeHtml(item.description)}</div>
+          <div class="meta">
+            <div class="meta-line">
+              <span><span class="k">Date début:</span> <span class="v">${item.dateDebut}</span></span>
+            </div>
+            <div class="meta-line">
+              <span><span class="k">Intervalle:</span> <span class="v">${item.intervalJours}</span> <span class="k">jour(s)</span></span>
+              <span>•</span>
+              <span><span class="k">Prochaine:</span> <span class="v">${nextYMD}</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          ${badge}
+          <button title="Modifier">✏️</button>
+          <button class="danger" title="Supprimer">🗑️</button>
+        </div>
+      `;
+
+      row.addEventListener("click", (e) => {
+        if (e.target && e.target.tagName === "INPUT") return;
+        selectRow(idx);
+      });
+
+      const chk = row.querySelector('input[type="checkbox"]');
+      chk.addEventListener("change", () => {
+        if (chk.checked) pending.add(item.id);
+        else pending.delete(item.id);
+        updatePendingInfo();
+      });
+
+      const btnEdit = row.querySelectorAll(".actions button")[0];
+      const btnDel  = row.querySelectorAll(".actions button")[1];
+
+      btnEdit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(item); });
+      btnDel.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const ok = confirm(`Supprimer (et journal) :\n\n${item.description} ?`);
+        if (!ok) return;
+        await deleteItemCascade(item.id);
+        pending.delete(item.id);
+        updatePendingInfo();
+        await render();
+      });
+
+      elList.appendChild(row);
+    });
+
+    if (computed.length === 0) selectedRowIndex = -1;
+    else if (selectedRowIndex >= computed.length) selectedRowIndex = computed.length - 1;
+    if (selectedRowIndex >= 0) selectRow(selectedRowIndex);
+
+    updatePendingInfo();
+  }
+
+  // Keyboard navigation
+  document.addEventListener("keydown", (e) => {
+    if (dlgEdit.open || dlgHistory.open) return;
+    const rows = [...elList.querySelectorAll(".row")];
+    if (!rows.length) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const i = Math.min(rows.length - 1, Math.max(0, selectedRowIndex + 1));
+      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const i = Math.max(0, selectedRowIndex - 1);
+      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const cur = currentRows[selectedRowIndex];
+      if (cur) openEdit(cur.item);
+    } else if (e.key === " ") {
+      e.preventDefault();
+      const row = rows[selectedRowIndex];
+      if (!row) return;
+      const chk = row.querySelector('input[type="checkbox"]');
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event("change"));
+    }
+  });
+
+  // Buttons
+  document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
+  document.querySelector("#btnCloseEdit").addEventListener("click", closeEdit);
+  document.querySelector("#btnCancel").addEventListener("click", closeEdit);
+  document.querySelector("#btnSave").addEventListener("click", saveEdit);
+  document.querySelector("#btnDelete").addEventListener("click", doDelete);
+
+  btnSaveChecks.addEventListener("click", savePendingChecks);
+  btnClearChecks.addEventListener("click", clearPendingChecksUIOnly);
+
+  // ===== Export / Import JSON =====
+  btnExport.addEventListener("click", exportJSON);
+  btnImport.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", onImportFileChosen);
+
+  async function exportJSON() {
+    const items = await getAll("items");
+    const checks = await getAll("checks");
+    const alerts = await getAll("alerts");
+
+    const payload = {
+      app: "Entretien",
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: { items, checks, alerts }
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entretien-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function onImportFileChosen() {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+
+    const text = await file.text();
+    let json;
+    try { json = JSON.parse(text); }
+    catch { alert("Fichier JSON invalide."); return; }
+
+    if (!json || json.app !== "Entretien" || !json.data) {
+      alert("Ce JSON ne semble pas être un backup Entretien.");
+      return;
+    }
+
+    const items = json.data.items || [];
+    const checks = json.data.checks || [];
+    const alerts = json.data.alerts || [];
+
+    const ok = confirm(
+      `Importer backup ?\n\nItems: ${items.length}\nChecks: ${checks.length}\nAlertes: ${alerts.length}\n\n` +
+      `⚠️ OK = REMPLACER toutes les données actuelles.`
+    );
+    if (!ok) return;
+
+    await clearAllData();
+    for (const it of items) await put("items", it);
+    for (const c of checks) await put("checks", c);
+    for (const a of alerts) await put("alerts", a);
+
+    const maxId = Math.max(0, ...items.map(x => x.id||0), ...checks.map(x => x.id||0), ...alerts.map(x => x.id||0));
+    const { t, stores } = tx(["meta"], "readwrite");
+    stores.meta.put({ key: "seed", value: maxId + 1 });
+    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
+
+    pending.clear();
+    updatePendingInfo();
+    await render();
+    alert("Import terminé ✅");
+  }
+
+  // ===== Journal (History) =====
+  document.querySelector("#btnHistory").addEventListener("click", openHistory);
+  document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
+  document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
+
+  tabGlobal.addEventListener("click", () => setHistTab("global"));
+  tabByItem.addEventListener("click", () => setHistTab("item"));
+
+  function setHistTab(which) {
+    const isGlobal = which === "global";
+    viewGlobal.classList.toggle("hidden", !isGlobal);
+    viewByItem.classList.toggle("hidden", isGlobal);
+    tabGlobal.classList.toggle("primary", isGlobal);
+    tabByItem.classList.toggle("primary", !isGlobal);
+  }
+
+  async function openHistory() {
+    await renderHistoryGlobal();
+    await renderHistoryItemPicker();
+    setHistTab("global");
+    dlgHistory.showModal();
+  }
+
+  async function renderHistoryGlobal() {
+    const items = await getAll("items");
+    const byId = Object.fromEntries(items.map(i => [i.id, i.description]));
+
+    const checks = await getAll("checks");
+    const alerts = await getAll("alerts");
+
+    const events = [];
+    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck, itemId:c.itemId }));
+
+    alerts.forEach(a => {
+      const dueDate = fromYMD(a.dueDateYMD);
+      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
+      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
+      events.push({ type:"alert", ts:a.dateAlert, itemId:a.itemId, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
+    });
+
+    events.sort((a,b)=>b.ts - a.ts);
+
+    viewGlobal.innerHTML = events.length ? "" : `<div class="hist-item">Aucun journal.</div>`;
+    for (const ev of events.slice(0, 300)) {
+      const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
+      const box = document.createElement("div");
+      box.className = "hist-item";
+      if (ev.type === "done") {
+        box.innerHTML = `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`;
+      } else {
+        box.innerHTML = `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
+                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      }
+      viewGlobal.appendChild(box);
+    }
+  }
+
+  async function renderHistoryItemPicker() {
+    const items = await getAll("items");
+    histItemSelect.innerHTML = "";
+    items.sort((a,b)=>a.description.localeCompare(b.description,"fr")).forEach(it => {
+      const opt = document.createElement("option");
+      opt.value = String(it.id);
+      opt.textContent = it.description;
+      histItemSelect.appendChild(opt);
+    });
+    histItemSelect.onchange = renderHistoryForSelectedItem;
+    await renderHistoryForSelectedItem();
+  }
+
+  async function renderHistoryForSelectedItem() {
+    const itemId = Number(histItemSelect.value);
+    if (!itemId) { histItemEvents.innerHTML = ""; return; }
+
+    const item = (await getAll("items")).find(x => x.id === itemId);
+    const checks = await getAll("checks", "by_item", itemId);
+    const alerts = await getAll("alerts", "by_item", itemId);
+
+    const events = [];
+    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck }));
+    alerts.forEach(a => {
+      const dueDate = fromYMD(a.dueDateYMD);
+      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
+      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
+      events.push({ type:"alert", ts:a.dateAlert, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
+    });
+    events.sort((a,b)=>b.ts - a.ts);
+
+    histItemEvents.innerHTML = "";
+    const title = document.createElement("div");
+    title.className = "hist-item";
+    title.innerHTML = `<div class="t">📌 ${escapeHtml(item?.description ?? "")}</div>`;
+    histItemEvents.appendChild(title);
+
+    if (!events.length) {
+      const empty = document.createElement("div");
+      empty.className = "hist-item";
+      empty.textContent = "Aucun événement pour cet item.";
+      histItemEvents.appendChild(empty);
+      return;
+    }
+
+    for (const ev of events.slice(0, 300)) {
+      const box = document.createElement("div");
+      box.className = "hist-item";
+      if (ev.type === "done") {
+        box.innerHTML = `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`;
+      } else {
+        box.innerHTML = `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
+                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      }
+      histItemEvents.appendChild(box);
+    }
+  }
+
+  document.querySelector("#btnClearHist").addEventListener("click", async () => {
+    const ok = confirm("Vider tout le journal (Fait + Alertes) ? Les items restent.");
+    if (!ok) return;
+
+    const { t, stores } = tx(["checks","alerts"], "readwrite");
+    stores.checks.clear();
+    stores.alerts.clear();
+    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
+
+    pending.clear();
+    updatePendingInfo();
+    await renderHistoryGlobal();
+    await render();
+  });
+
+  // Auto refresh
+  setInterval(render, 5 * 60 * 1000);
+
+  // Init
+  (async function init() {
+    db = await openDB();
+    updatePendingInfo();
+    await render();
+  })();
+
+})();
+</script>
+</body>
+</html>
