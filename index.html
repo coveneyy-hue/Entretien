@@ -9,7 +9,7 @@
     body { margin: 0; background: #f6f7f9; color: #111; }
     header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 3; }
     h1 { margin: 0; font-size: 18px; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 120px; }
+    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 86px; } /* reduced for shorter bottom bar */
 
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
     button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
@@ -62,26 +62,47 @@
     .due-banner li { margin: 4px 0; }
     .small { font-size: 12px; opacity: .9; }
 
-    /* Bottom fixed bar */
+    /* Bottom fixed bar - compact single row */
     .bottom-bar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
       background: rgba(255,255,255,.92);
       backdrop-filter: blur(6px);
       border-top: 1px solid #e6e8ee;
-      padding: 10px 12px;
+      padding: 8px 10px;
       z-index: 4;
     }
     .bottom-inner {
       max-width: 980px;
       margin: 0 auto;
-      display: flex;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
       align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
     }
-    .bottom-actions { display:flex; gap:8px; flex-wrap: wrap; justify-content:flex-end; }
+    .bottom-actions {
+      display:flex;
+      gap: 8px;
+      justify-content:flex-end;
+      align-items:center;
+      flex-wrap: nowrap; /* keep on one line */
+    }
+
+    /* icon buttons */
+    .icon-btn{
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .icon-btn.primary { background:#111; color:#fff; border-color:#111; }
+    .icon-btn[disabled]{ opacity:.55; }
+    .icon{ line-height: 1; }
 
     dialog { width: min(560px, 94vw); border: 1px solid #e6e8ee; border-radius: 14px; padding: 0; }
     dialog::backdrop { background: rgba(0,0,0,.35); }
@@ -106,6 +127,11 @@
     }
     input[disabled] { background: #f3f4f7; color: #333; }
     label { font-size: 12px; color: #333; font-weight: 900; display: block; margin: 10px 0 6px; }
+
+    @media (max-width: 520px){
+      .bottom-inner { grid-template-columns: 1fr; }
+      .bottom-actions { justify-content: space-between; }
+    }
   </style>
 </head>
 <body>
@@ -128,10 +154,11 @@
   <div class="bottom-inner">
     <div class="pill" id="pendingInfo">0 sélectionné(s) à enregistrer</div>
     <div class="bottom-actions">
-      <button id="btnExport">Export JSON</button>
-      <button id="btnImport">Import JSON</button>
-      <button id="btnClearChecks">Réinitialiser checks</button>
-      <button class="primary" id="btnSaveChecks" disabled>Enregistrer</button>
+      <!-- tooltips via title -->
+      <button class="icon-btn" id="btnExport" title="Export JSON"><span class="icon">⬆️</span></button>
+      <button class="icon-btn" id="btnImport" title="Import JSON"><span class="icon">⬇️</span></button>
+      <button class="icon-btn" id="btnClearChecks" title="Réinitialiser sélection"><span class="icon">🧹</span></button>
+      <button class="icon-btn primary" id="btnSaveChecks" title="Enregistrer (Fait)" disabled><span class="icon">👍</span></button>
     </div>
   </div>
   <input id="fileInput" type="file" accept="application/json,.json" class="hidden" />
@@ -563,7 +590,7 @@
       const nextYMD = toYMD(st.dueDate);
       const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
 
-      row = document.createElement("div");
+      const row = document.createElement("div");
       row.className = "row";
       row.tabIndex = 0;
 
@@ -575,9 +602,8 @@
           <div class="desc">${escapeHtml(item.description)}</div>
           <div class="meta">
             <div class="meta-line">
-              <span><span class="k">Date début:</span> <span class="v">${item.dateDebut}</span></span>
-            </div>
-            <div class="meta-line">
+              <span><span class="k">Début:</span> <span class="v">${item.dateDebut}</span></span>
+              <span>•</span>
               <span><span class="k">Intervalle:</span> <span class="v">${item.intervalJours}</span> <span class="k">jour(s)</span></span>
               <span>•</span>
               <span><span class="k">Prochaine:</span> <span class="v">${nextYMD}</span></span>
@@ -657,13 +683,13 @@
 
   // Buttons
   document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
-  document.querySelector("#btnCloseEdit").addEventListener("click", closeEdit);
-  document.querySelector("#btnCancel").addEventListener("click", closeEdit);
+  document.querySelector("#btnCloseEdit").addEventListener("click", () => dlgEdit.close());
+  document.querySelector("#btnCancel").addEventListener("click", () => dlgEdit.close());
   document.querySelector("#btnSave").addEventListener("click", saveEdit);
   document.querySelector("#btnDelete").addEventListener("click", doDelete);
 
   btnSaveChecks.addEventListener("click", savePendingChecks);
-  btnClearChecks.addEventListener("click", clearPendingChecksUIOnly);
+  btnClearChecks.addEventListener("click", () => { pending.clear(); updatePendingInfo(); render(); });
 
   // ===== Export / Import JSON =====
   btnExport.addEventListener("click", exportJSON);
@@ -739,15 +765,15 @@
   document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
   document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
 
-  tabGlobal.addEventListener("click", () => setHistTab("global"));
-  tabByItem.addEventListener("click", () => setHistTab("item"));
+  document.querySelector("#tabGlobal").addEventListener("click", () => setHistTab("global"));
+  document.querySelector("#tabByItem").addEventListener("click", () => setHistTab("item"));
 
   function setHistTab(which) {
     const isGlobal = which === "global";
     viewGlobal.classList.toggle("hidden", !isGlobal);
     viewByItem.classList.toggle("hidden", isGlobal);
-    tabGlobal.classList.toggle("primary", isGlobal);
-    tabByItem.classList.toggle("primary", !isGlobal);
+    document.querySelector("#tabGlobal").classList.toggle("primary", isGlobal);
+    document.querySelector("#tabByItem").classList.toggle("primary", !isGlobal);
   }
 
   async function openHistory() {
@@ -766,14 +792,12 @@
 
     const events = [];
     checks.forEach(c => events.push({ type:"done", ts:c.dateCheck, itemId:c.itemId }));
-
     alerts.forEach(a => {
       const dueDate = fromYMD(a.dueDateYMD);
       const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
       const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
       events.push({ type:"alert", ts:a.dateAlert, itemId:a.itemId, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
     });
-
     events.sort((a,b)=>b.ts - a.ts);
 
     viewGlobal.innerHTML = events.length ? "" : `<div class="hist-item">Aucun journal.</div>`;
@@ -781,12 +805,10 @@
       const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
       const box = document.createElement("div");
       box.className = "hist-item";
-      if (ev.type === "done") {
-        box.innerHTML = `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`;
-      } else {
-        box.innerHTML = `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
-                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
-      }
+      box.innerHTML = (ev.type === "done")
+        ? `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`
+        : `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
+           <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
       viewGlobal.appendChild(box);
     }
   }
@@ -839,12 +861,10 @@
     for (const ev of events.slice(0, 300)) {
       const box = document.createElement("div");
       box.className = "hist-item";
-      if (ev.type === "done") {
-        box.innerHTML = `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`;
-      } else {
-        box.innerHTML = `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
-                         <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
-      }
+      box.innerHTML = (ev.type === "done")
+        ? `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`
+        : `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
+           <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
       histItemEvents.appendChild(box);
     }
   }
@@ -864,10 +884,8 @@
     await render();
   });
 
-  // Auto refresh
+  // Init / refresh
   setInterval(render, 5 * 60 * 1000);
-
-  // Init
   (async function init() {
     db = await openDB();
     updatePendingInfo();
