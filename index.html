@@ -598,7 +598,13 @@
 
     elList.innerHTML = "";
     computed.forEach(({item, st}, idx) => {
-      const nextYMD = toYMD(st.dueDate);
+      const today = startOfToday();
+      const daysRemaining = daysBetween(today, st.dueDate);
+      const remainLabel = st.isDue
+        ? `Retard de ${st.daysDue} jour(s)`
+        : daysRemaining === 0
+          ? `Aujourd'hui`
+          : `Il reste ${daysRemaining} jour(s)`;
       const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
 
       const row = document.createElement("div");
@@ -617,7 +623,7 @@
               <span>•</span>
               <span><span class="k">Intervalle:</span> <span class="v">${item.intervalJours}</span> <span class="k">jour(s)</span></span>
               <span>•</span>
-              <span><span class="k">Prochaine:</span> <span class="v">${nextYMD}</span></span>
+              <span><span class="k v">${remainLabel}</span></span>
             </div>
           </div>
         </div>
