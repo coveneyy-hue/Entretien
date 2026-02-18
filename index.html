@@ -8,8 +8,9 @@
     :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     body { margin: 0; background: #f6f7f9; color: #111; }
     header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 3; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     h1 { margin: 0; font-size: 18px; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 86px; } /* shorter bottom bar */
+    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 70px; }
 
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
     button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
@@ -62,7 +63,31 @@
     .due-banner li { margin: 4px 0; }
     .small { font-size: 12px; opacity: .9; }
 
-    /* Bottom fixed bar - compact single row */
+    /* Save button in header - 2x bigger */
+    .btn-save-header {
+      width: 84px;
+      height: 84px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 18px;
+      font-size: 36px;
+      font-weight: 900;
+      background: #111;
+      color: #fff;
+      border-color: #111;
+      flex-shrink: 0;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-save-header[disabled] {
+      opacity: .35;
+    }
+    .btn-save-header:active:not([disabled]) {
+      transform: scale(0.96);
+    }
+
+    /* Bottom fixed bar - compact, no thumbs up */
     .bottom-bar {
       position: fixed;
       left: 0; right: 0; bottom: 0;
@@ -85,7 +110,7 @@
       gap: 8px;
       justify-content:flex-end;
       align-items:center;
-      flex-wrap: nowrap; /* keep on one line */
+      flex-wrap: nowrap;
     }
 
     /* icon buttons */
@@ -136,11 +161,17 @@
 </head>
 <body>
 <header>
-  <h1>Entretien</h1>
+  <div class="header-top">
+    <div>
+      <h1>Entretien</h1>
+    </div>
+    <button class="btn-save-header" id="btnSaveChecks" title="Enregistrer (Fait)" disabled>👍</button>
+  </div>
   <div class="toolbar">
     <button class="primary" id="btnAdd">+ Ajouter</button>
     <button id="btnHistory">Journal</button>
     <span class="pill" id="stats">—</span>
+    <span class="pill" id="pendingInfo">0 sélectionné(s)</span>
   </div>
 </header>
 
@@ -152,12 +183,11 @@
 <!-- Bottom fixed bar -->
 <div class="bottom-bar">
   <div class="bottom-inner">
-    <div class="pill" id="pendingInfo">0 sélectionné(s) à enregistrer</div>
+    <div></div>
     <div class="bottom-actions">
       <button class="icon-btn" id="btnExport" title="Export JSON"><span class="icon">⬆️</span></button>
       <button class="icon-btn" id="btnImport" title="Import JSON"><span class="icon">⬇️</span></button>
       <button class="icon-btn" id="btnClearChecks" title="Réinitialiser sélection"><span class="icon">🧹</span></button>
-      <button class="icon-btn primary" id="btnSaveChecks" title="Enregistrer (Fait)" disabled><span class="icon">👍</span></button>
     </div>
   </div>
   <input id="fileInput" type="file" accept="application/json,.json" class="hidden" />
@@ -176,7 +206,7 @@
     </label>
 
     <label>
-      Nombre d’itérations (Fait)
+      Nombre d'itérations (Fait)
       <input id="fIter" type="number" disabled value="0" />
     </label>
 
@@ -196,7 +226,7 @@
   <div class="modal-foot">
     <button id="btnDelete" class="danger hidden">Supprimer</button>
     <button id="btnCancel">Annuler</button>
-    <button id="btnSave" class="primary">Enregistrer l’item</button>
+    <button id="btnSave" class="primary">Enregistrer l'item</button>
   </div>
 </dialog>
 
@@ -369,7 +399,7 @@
 
     return {
       lastTs: last,
-      refYMD: toYMD(refDate),     // <-- "Dernier entretien" (ou date début si aucun fait)
+      refYMD: toYMD(refDate),
       dueDate,
       isDue,
       daysDue
@@ -419,7 +449,7 @@
   const histItemEvents = document.querySelector("#histItemEvents");
 
   let selectedRowIndex = -1;
-  let currentRows = []; // [{item, st}]
+  let currentRows = [];
   let editingId = null;
 
   // Batch selection (checkboxes)
@@ -439,7 +469,7 @@
 
     if (!item) {
       fIter.value = 0;
-      fDernier.value = fStart.value; // aucun fait => date début
+      fDernier.value = fStart.value;
     } else {
       const checks = await getAll("checks", "by_item", item.id);
       fIter.value = checks.length;
@@ -469,7 +499,6 @@
       const id = await nextId();
       await put("items", { id, description, dateDebut, intervalJours });
     } else {
-      // Prompt de réinitialisation si la date/intervalle change et qu'il existe des checks
       const old = (await getAll("items")).find(x => x.id === editingId);
       const dateChanged = old && old.dateDebut !== dateDebut;
       const intChanged  = old && Number(old.intervalJours) !== Number(intervalJours);
@@ -478,14 +507,14 @@
         const existingChecks = await getAll("checks", "by_item", editingId);
         if (existingChecks.length > 0) {
           const okReset = confirm(
-            "Tu as modifié la date de début et/ou l’intervalle.\n\n" +
-            "Veux-tu RÉINITIALISER le compteur (supprimer l’historique 'Fait')\n" +
+            "Tu as modifié la date de début et/ou l'intervalle.\n\n" +
+            "Veux-tu RÉINITIALISER le compteur (supprimer l'historique 'Fait')\n" +
             "pour recalculer la prochaine date à partir de la nouvelle date de début ?"
           );
           if (okReset) {
             await deleteChecksForItem(editingId);
             fIter.value = 0;
-            fDernier.value = dateDebut; // plus de fait => date début devient la référence
+            fDernier.value = dateDebut;
           }
         }
       }
@@ -513,29 +542,12 @@
   }
 
   function updatePendingInfo() {
-    pendingInfo.textContent = `${pending.size} sélectionné(s) à enregistrer`;
+    pendingInfo.textContent = `${pending.size} sélectionné(s)`;
     btnSaveChecks.disabled = pending.size === 0;
-  }
-
-  function buildConfirmationList() {
-    const selected = currentRows.filter(r => pending.has(r.item.id)).map(r => r.item.description);
-    selected.sort((a,b)=>a.localeCompare(b,"fr"));
-    const preview = selected.slice(0, 10);
-    const more = selected.length - preview.length;
-    const lines = preview.map(s => `• ${s}`);
-    if (more > 0) lines.push(`• … et ${more} autre(s)`);
-    return { count: selected.length, text: lines.join("\n") };
   }
 
   async function savePendingChecks() {
     if (pending.size === 0) return;
-
-    const { count, text } = buildConfirmationList();
-    const ok = confirm(
-      `Enregistrer "Fait" pour ${count} item(s) ?\n\n${text}\n\n` +
-      `Ça réinitialise leur prochaine date selon l’intervalle.`
-    );
-    if (!ok) return;
 
     const now = Date.now();
     for (const itemId of pending) {
@@ -583,7 +595,6 @@
       computed.push({ item: it, st });
     }
 
-    // DU first, then nearest dueDate
     computed.sort((a,b) => {
       if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
       return a.st.dueDate - b.st.dueDate;
