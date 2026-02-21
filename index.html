@@ -92,10 +92,10 @@
       transform: scale(0.96);
     }
 
-    /* Toast notification above save button */
+    /* Toast notification below save button */
     .save-toast {
       position: absolute;
-      bottom: calc(100% + 8px);
+      top: calc(100% + 8px);
       right: 0;
       background: #116b2f;
       color: #fff;
@@ -107,16 +107,17 @@
       pointer-events: none;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       opacity: 0;
-      transform: translateY(4px);
+      transform: translateY(-4px);
       transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 10;
     }
-    .save-toast::after {
+    .save-toast::before {
       content: '';
       position: absolute;
-      top: 100%;
+      bottom: 100%;
       right: 12px;
       border: 5px solid transparent;
-      border-top-color: #116b2f;
+      border-bottom-color: #116b2f;
     }
     .save-toast.visible {
       opacity: 1;
@@ -201,16 +202,16 @@
     <div>
       <h1>Entretien</h1>
     </div>
-    <div class="save-btn-wrap">
-      <div class="save-toast" id="saveToast">✅ Enregistré !</div>
-      <button class="btn-save-header" id="btnSaveChecks" title="Enregistrer (Fait)" disabled>💾</button>
-    </div>
   </div>
   <div class="toolbar">
     <button class="primary" id="btnAdd">+ Ajouter</button>
     <button id="btnHistory">Journal</button>
     <span class="pill" id="stats">—</span>
     <span class="pill" id="pendingInfo">0 sélectionné(s)</span>
+    <div class="save-btn-wrap" style="margin-left:auto;">
+      <div class="save-toast" id="saveToast">✅ Enregistré !</div>
+      <button class="btn-save-header" id="btnSaveChecks" title="Enregistrer (Fait)" disabled>💾</button>
+    </div>
   </div>
 </header>
 
