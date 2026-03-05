@@ -175,9 +175,13 @@
     .tabs { display: flex; gap: 8px; margin-top: 10px; }
     .tabs button { flex: 1; }
     .hidden { display: none; }
-    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; background: #fff; }
+    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; background: #fff; position: relative; }
     .hist-item .t { font-weight: 900; }
     .hist-item .s { font-size: 12px; color: #555; margin-top: 2px; }
+    .hist-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .hist-actions button { font-size: 11px; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
+    .hist-actions .btn-edit-hist { border-color: #c8d1e0; background: #f0f2f7; }
+    .hist-actions .btn-del-hist { border-color: #ffced0; background: #fff5f6; color: #b00020; }
 
     input[type="text"], input[type="number"], input[type="date"], select {
       width: 100%;
@@ -892,6 +896,19 @@
         ? `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`
         : `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
            <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      const actions = document.createElement("div");
+      actions.className = "hist-actions";
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn-edit-hist";
+      btnEdit.textContent = "✏️ Modifier";
+      btnEdit.addEventListener("click", () => editHistEntry(ev));
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn-del-hist";
+      btnDel.textContent = "🗑 Supprimer";
+      btnDel.addEventListener("click", () => deleteHistEntry(ev));
+      actions.appendChild(btnEdit);
+      actions.appendChild(btnDel);
+      box.appendChild(actions);
       viewGlobal.appendChild(box);
     }
   }
@@ -948,8 +965,60 @@
         ? `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`
         : `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
            <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
+      const actions = document.createElement("div");
+      actions.className = "hist-actions";
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn-edit-hist";
+      btnEdit.textContent = "✏️ Modifier";
+      btnEdit.addEventListener("click", () => editHistEntry({ ...ev, itemId: itemId }));
+      const btnDel = document.createElement("button");
+      btnDel.className = "btn-del-hist";
+      btnDel.textContent = "🗑 Supprimer";
+      btnDel.addEventListener("click", () => deleteHistEntry({ ...ev, itemId: itemId }));
+      actions.appendChild(btnEdit);
+      actions.appendChild(btnDel);
+      box.appendChild(actions);
       histItemEvents.appendChild(box);
     }
+  }
+
+  // ===== Edit / Delete journal entries =====
+  async function findRecordByEvent(ev) {
+    const store = ev.type === "done" ? "checks" : "alerts";
+    const tsField = ev.type === "done" ? "dateCheck" : "dateAlert";
+    const all = await getAll(store, "by_item", ev.itemId);
+    return { store, tsField, record: all.find(r => r[tsField] === ev.ts) };
+  }
+
+  async function deleteHistEntry(ev) {
+    const { store, record } = await findRecordByEvent(ev);
+    if (!record) { alert("Entrée introuvable."); return; }
+    const label = ev.type === "done" ? "Fait" : "Alerte";
+    if (!confirm(`Supprimer cette entrée du journal ?\n\n${label} — ${fmtDT(ev.ts)}`)) return;
+    const { t, stores } = tx([store], "readwrite");
+    stores[store].delete(record.id);
+    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
+    await refreshHistAndMain();
+  }
+
+  async function editHistEntry(ev) {
+    const { store, tsField, record } = await findRecordByEvent(ev);
+    if (!record) { alert("Entrée introuvable."); return; }
+    const current = new Date(ev.ts);
+    const isoLocal = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,"0")}-${String(current.getDate()).padStart(2,"0")}T${String(current.getHours()).padStart(2,"0")}:${String(current.getMinutes()).padStart(2,"0")}`;
+    const input = prompt("Modifier la date/heure :", isoLocal);
+    if (!input) return;
+    const parsed = new Date(input);
+    if (isNaN(parsed.getTime())) { alert("Date invalide."); return; }
+    record[tsField] = parsed.getTime();
+    await put(store, record);
+    await refreshHistAndMain();
+  }
+
+  async function refreshHistAndMain() {
+    await renderHistoryGlobal();
+    await renderHistoryItemPicker();
+    await render();
   }
 
   document.querySelector("#btnClearHist").addEventListener("click", async () => {
@@ -979,4 +1048,3 @@
 </script>
 </body>
 </html>
-
