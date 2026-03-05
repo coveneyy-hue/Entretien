@@ -303,7 +303,32 @@
   </div>
 </dialog>
 
-<script>
+<!-- Modal Modifier entrée journal -->
+<dialog id="dlgEditHist">
+  <div class="modal-head">
+    <strong>Modifier l'entrée</strong>
+    <button id="btnCloseEditHist" aria-label="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <label style="display:block; margin-bottom:8px; font-weight:700;">Date / heure</label>
+    <input type="datetime-local" id="ehDate" style="width:100%; box-sizing:border-box;" />
+
+    <div id="ehDueWrap" style="margin-top:12px; display:none;">
+      <label style="display:block; margin-bottom:8px; font-weight:700;">Date d'échéance (dû depuis X jours)</label>
+      <input type="date" id="ehDueDate" style="width:100%; box-sizing:border-box;" />
+      <div id="ehDuePreview" style="margin-top:4px; font-size:12px; color:#555;"></div>
+    </div>
+
+    <div id="ehDescWrap" style="margin-top:12px;">
+      <label style="display:block; margin-bottom:8px; font-weight:700;">Description de l'item</label>
+      <input type="text" id="ehDesc" style="width:100%; box-sizing:border-box;" />
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button id="btnCancelEditHist">Annuler</button>
+    <button id="btnSaveEditHist" class="primary">Enregistrer</button>
+  </div>
+</dialog>
 (() => {
   // ===== Utils =====
   const pad2 = n => String(n).padStart(2, "0");
@@ -1004,15 +1029,95 @@
   async function editHistEntry(ev) {
     const { store, tsField, record } = await findRecordByEvent(ev);
     if (!record) { alert("Entrée introuvable."); return; }
+
+    // Load item for description editing
+    const items = await getAll("items");
+    const item = items.find(i => i.id === ev.itemId);
+
+    const dlg = document.querySelector("#dlgEditHist");
+    const ehDate = document.querySelector("#ehDate");
+    const ehDueWrap = document.querySelector("#ehDueWrap");
+    const ehDueDate = document.querySelector("#ehDueDate");
+    const ehDuePreview = document.querySelector("#ehDuePreview");
+    const ehDesc = document.querySelector("#ehDesc");
+
+    // Populate date/time
     const current = new Date(ev.ts);
-    const isoLocal = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,"0")}-${String(current.getDate()).padStart(2,"0")}T${String(current.getHours()).padStart(2,"0")}:${String(current.getMinutes()).padStart(2,"0")}`;
-    const input = prompt("Modifier la date/heure :", isoLocal);
-    if (!input) return;
-    const parsed = new Date(input);
-    if (isNaN(parsed.getTime())) { alert("Date invalide."); return; }
-    record[tsField] = parsed.getTime();
+    ehDate.value = toLocalISO(current);
+
+    // Show due date field only for alerts
+    if (ev.type === "alert") {
+      ehDueWrap.style.display = "block";
+      ehDueDate.value = record.dueDateYMD;
+      updateDuePreview();
+      ehDueDate.oninput = updateDuePreview;
+      ehDate.oninput = updateDuePreview;
+    } else {
+      ehDueWrap.style.display = "none";
+      ehDueDate.oninput = null;
+      ehDate.oninput = null;
+    }
+
+    function updateDuePreview() {
+      const due = fromYMD(ehDueDate.value);
+      const alertD = new Date(ehDate.value);
+      if (!isNaN(due) && !isNaN(alertD)) {
+        alertD.setHours(0,0,0,0);
+        const days = Math.max(0, daysBetween(due, alertD));
+        ehDuePreview.textContent = `→ dû depuis ${days} jour(s)`;
+      } else {
+        ehDuePreview.textContent = "";
+      }
+    }
+
+    // Populate description
+    ehDesc.value = item ? item.description : "";
+
+    dlg.showModal();
+
+    // Wait for user action
+    const result = await new Promise(resolve => {
+      function onSave() { cleanup(); resolve("save"); }
+      function onCancel() { cleanup(); resolve("cancel"); }
+      function cleanup() {
+        document.querySelector("#btnSaveEditHist").removeEventListener("click", onSave);
+        document.querySelector("#btnCancelEditHist").removeEventListener("click", onCancel);
+        document.querySelector("#btnCloseEditHist").removeEventListener("click", onCancel);
+      }
+      document.querySelector("#btnSaveEditHist").addEventListener("click", onSave);
+      document.querySelector("#btnCancelEditHist").addEventListener("click", onCancel);
+      document.querySelector("#btnCloseEditHist").addEventListener("click", onCancel);
+    });
+
+    dlg.close();
+    if (result !== "save") return;
+
+    // Validate & save date
+    const parsedDate = new Date(ehDate.value);
+    if (isNaN(parsedDate.getTime())) { alert("Date invalide."); return; }
+    record[tsField] = parsedDate.getTime();
+
+    // Save due date for alerts
+    if (ev.type === "alert") {
+      const newDue = ehDueDate.value;
+      if (!newDue) { alert("Date d'échéance invalide."); return; }
+      record.dueDateYMD = newDue;
+      record.dueKey = `${ev.itemId}|${newDue}`;
+    }
+
     await put(store, record);
+
+    // Save description if changed
+    if (item && ehDesc.value.trim() && ehDesc.value.trim() !== item.description) {
+      item.description = ehDesc.value.trim();
+      await put("items", item);
+    }
+
     await refreshHistAndMain();
+  }
+
+  function toLocalISO(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
   }
 
   async function refreshHistAndMain() {
