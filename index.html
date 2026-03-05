@@ -329,6 +329,8 @@
     <button id="btnSaveEditHist" class="primary">Enregistrer</button>
   </div>
 </dialog>
+
+<script>
 (() => {
   // ===== Utils =====
   const pad2 = n => String(n).padStart(2, "0");
@@ -1019,11 +1021,18 @@
     const { store, record } = await findRecordByEvent(ev);
     if (!record) { alert("Entrée introuvable."); return; }
     const label = ev.type === "done" ? "Fait" : "Alerte";
-    if (!confirm(`Supprimer cette entrée du journal ?\n\n${label} — ${fmtDT(ev.ts)}`)) return;
+    const dlgHistory = document.querySelector("#dlgHistory");
+    const histWasOpen = dlgHistory.open;
+    if (histWasOpen) dlgHistory.close();
+    if (!confirm(`Supprimer cette entrée du journal ?\n\n${label} — ${fmtDT(ev.ts)}`)) {
+      if (histWasOpen) dlgHistory.showModal();
+      return;
+    }
     const { t, stores } = tx([store], "readwrite");
     stores[store].delete(record.id);
     await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
     await refreshHistAndMain();
+    if (histWasOpen) dlgHistory.showModal();
   }
 
   async function editHistEntry(ev) {
@@ -1073,6 +1082,11 @@
     // Populate description
     ehDesc.value = item ? item.description : "";
 
+    // Close history dialog first to avoid stacked modals
+    const dlgHistory = document.querySelector("#dlgHistory");
+    const histWasOpen = dlgHistory.open;
+    if (histWasOpen) dlgHistory.close();
+
     dlg.showModal();
 
     // Wait for user action
@@ -1090,7 +1104,12 @@
     });
 
     dlg.close();
-    if (result !== "save") return;
+
+    if (result !== "save") {
+      // Reopen history if it was open before
+      if (histWasOpen) { dlgHistory.showModal(); await renderHistoryGlobal(); await renderHistoryItemPicker(); }
+      return;
+    }
 
     // Validate & save date
     const parsedDate = new Date(ehDate.value);
@@ -1114,6 +1133,8 @@
     }
 
     await refreshHistAndMain();
+    // Reopen history dialog
+    if (histWasOpen) dlgHistory.showModal();
   }
 
   function toLocalISO(d) {
