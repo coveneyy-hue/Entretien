@@ -2,1259 +2,1234 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Entretien</title>
-
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#1e0f46" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-  <meta name="apple-mobile-web-app-title" content="Entretien" />
-  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="R-compense" />
+  <meta name="description" content="Gestion des dépenses et récompenses pour Lily-Rose et Victor" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>R-compense</title>
   <style>
-    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    body { margin: 0; background: #f6f7f9; color: #111; }
-    header { padding: 14px 16px; background: #fff; position: sticky; top: 0; border-bottom: 1px solid #e6e8ee; z-index: 3; }
-    main { padding: 12px; max-width: 980px; margin: 0 auto; padding-bottom: 70px; }
-
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
-    button { border: 1px solid #d7dbe6; background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 800; }
-    button.primary { background: #111; color: #fff; border-color: #111; }
-    button.danger { border-color: #ffced0; }
-    button:active { transform: scale(0.99); }
-    button[disabled]{ opacity:.55; }
-
-    .pill { font-size: 12px; border: 1px solid #e6e8ee; border-radius: 999px; padding: 6px 10px; background: #fff; }
-
-    .list { display: grid; gap: 10px; margin-top: 12px; }
-    .row {
-      display: grid;
-      grid-template-columns: 38px 1fr auto;
-      gap: 10px;
-      align-items: center;
-      padding: 10px;
-      border: 1px solid #eef0f6;
-      border-radius: 12px;
-      background: #fff;
-    }
-    .row.selected { outline: 2px solid #111; }
-
-    .desc { font-weight: 900; user-select: text; -webkit-user-select: text; cursor: default; line-height: 1.1; }
-
-    .meta { margin-top: 6px; display: grid; gap: 4px; }
-    .meta-line { display:flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 12px; color: #333; }
-    .k { color: #555; font-weight: 800; }
-    .v { font-weight: 950; }
-
-    .status { font-size: 12px; font-weight: 900; padding: 6px 8px; border-radius: 999px; border: 1px solid #eee; white-space: nowrap; }
-    .due { color: #b00020; border-color: #ffd3da; background: #fff5f6; }
-    .ok { color: #116b2f; border-color: #cfe9d8; background: #f3fbf6; }
-
-    .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
-    .chk-wrap { display: flex; justify-content: center; }
-    input[type="checkbox"] { width: 22px; height: 22px; }
-
-    /* Top due banner */
-    .due-banner {
-      background: #fff5f6;
-      border: 1px solid #ffd3da;
-      color: #b00020;
-      border-radius: 14px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-    }
-    .due-banner .t { font-weight: 1000; }
-    .due-banner ul { margin: 8px 0 0 18px; padding: 0; }
-    .due-banner li { margin: 4px 0; }
-    .small { font-size: 12px; opacity: .9; }
-
-    /* Save button wrapper (relative for toast positioning) */
-    .save-btn-wrap {
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    /* Save button in header */
-    .btn-save-header {
-      width: 44px;
-      height: 44px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 12px;
-      font-size: 22px;
-      font-weight: 900;
-      background: #111;
-      color: #fff;
-      border-color: #111;
-      transition: opacity 0.15s, transform 0.1s;
-    }
-    .btn-save-header[disabled] {
-      opacity: .35;
-    }
-    .btn-save-header:active:not([disabled]) {
-      transform: scale(0.96);
-    }
-
-    /* Toast notification below save button */
-    .save-toast {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      background: #116b2f;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 800;
-      padding: 6px 10px;
-      border-radius: 10px;
-      white-space: nowrap;
-      pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-      opacity: 0;
-      transform: translateY(-4px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      z-index: 10;
-    }
-    .save-toast::before {
-      content: '';
-      position: absolute;
-      bottom: 100%;
-      right: 12px;
-      border: 5px solid transparent;
-      border-bottom-color: #116b2f;
-    }
-    .save-toast.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* Bottom fixed bar - compact, no thumbs up */
-    .bottom-bar {
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      background: rgba(255,255,255,.92);
-      backdrop-filter: blur(6px);
-      border-top: 1px solid #e6e8ee;
-      padding: 8px 10px;
-      z-index: 4;
-    }
-    .bottom-inner {
-      max-width: 980px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      align-items: center;
-    }
-    .bottom-actions {
-      display:flex;
-      gap: 8px;
-      justify-content:flex-end;
-      align-items:center;
-      flex-wrap: nowrap;
-    }
-
-    /* icon buttons */
-    .icon-btn{
-      width: 42px;
-      height: 42px;
-      padding: 0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: 900;
-    }
-    .icon-btn.primary { background:#111; color:#fff; border-color:#111; }
-    .icon-btn[disabled]{ opacity:.55; }
-    .icon{ line-height: 1; }
-
-    dialog { width: min(560px, 94vw); border: 1px solid #e6e8ee; border-radius: 14px; padding: 0; }
-    dialog::backdrop { background: rgba(0,0,0,.35); }
-    .modal-head { padding: 12px 14px; border-bottom: 1px solid #eef0f6; display: flex; justify-content: space-between; align-items: center; }
-    .modal-body { padding: 12px 14px; }
-    .modal-foot { padding: 12px 14px; border-top: 1px solid #eef0f6; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-    .count { float: right; font-size: 12px; color: #666; }
-    .tabs { display: flex; gap: 8px; margin-top: 10px; }
-    .tabs button { flex: 1; }
-    .hidden { display: none; }
-    .hist-item { padding: 10px; border: 1px solid #eef0f6; border-radius: 12px; background: #fff; position: relative; }
-    .hist-item .t { font-weight: 900; }
-    .hist-item .s { font-size: 12px; color: #555; margin-top: 2px; }
-    .hist-actions { display: flex; gap: 6px; margin-top: 6px; }
-    .hist-actions button { font-size: 11px; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
-    .hist-actions .btn-edit-hist { border-color: #c8d1e0; background: #f0f2f7; }
-    .hist-actions .btn-del-hist { border-color: #ffced0; background: #fff5f6; color: #b00020; }
-
-    input[type="text"], input[type="number"], input[type="date"], select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #d7dbe6;
-      border-radius: 10px;
-      font-size: 14px;
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#f6f7fb; color:#111827; }
+    header { padding: 14px 16px; background: #111827; color: #fff; }
+    header h1 { margin: 0; font-size: 18px; }
+    main { padding: 14px 16px 40px; max-width: 980px; margin: 0 auto; }
+    .card { background:#fff; border-radius: 14px; padding: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.06); margin-bottom: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { display:block; font-size: 12px; color:#374151; margin-bottom: 6px; }
+    select, input, button, textarea {
+      width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #e5e7eb; font-size: 16px; background:#fff;
       box-sizing: border-box;
     }
-    input[disabled] { background: #f3f4f7; color: #333; }
-    label { font-size: 12px; color: #333; font-weight: 900; display: block; margin: 10px 0 6px; }
+    input[type="number"] { text-align: right; }
+    button { cursor: pointer; border: 0; background:#111827; color:#fff; font-weight: 800; }
+    button.secondary { background:#e5e7eb; color:#111827; border: 1px solid #d1d5db; }
+    button.danger { background:#b91c1c; }
+    .actions { display:flex; gap: 10px; flex-wrap: wrap; }
+    .actions > * { flex: 1; min-width: 140px; }
+    .muted { color:#6b7280; font-size: 13px; }
+    .hint { font-size:12px; color:#6b7280; margin-top:6px; }
+    .hint.debit { color:#b91c1c; font-weight: 700; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .totals { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .totalBox { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px 12px; }
+    .totalBox .name { font-weight: 900; }
+    .totalBox .amt { font-size: 20px; font-weight: 1000; margin-top: 4px; }
+    .amt.pos { color:#065f46; }
+    .amt.neg { color:#b91c1c; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #f0f1f4; padding: 10px 6px; font-size: 14px; vertical-align: top; }
+    th { text-align:left; color:#374151; font-size: 12px; }
+    td.right, th.right { text-align:right; }
+    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; background:#f3f4f6; font-size: 12px; color:#111827; }
+    .smallBtn { padding:8px 10px; border-radius:10px; font-size: 13px; width:auto; }
+    .badgeEdit { display:inline-block; margin-left: 8px; font-size: 12px; padding: 2px 8px; border-radius: 999px; background:#111827; color:#fff; }
+    .toolbar { display:flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .toolbar > div { flex: 1; min-width: 160px; }
+    textarea { min-height: 92px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    details summary { cursor: pointer; font-weight: 1000; list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::marker { display: none; }
+    details summary::before { content: "▸"; display: inline-block; margin-right: 8px; color: #111827; transform: translateY(-1px); }
+    details[open] summary::before { content: "▾"; }
+    .kidBar { position: sticky; top: 0; left: 0; right: 0; padding: 10px 12px; background: rgba(246,247,251,.96); border-bottom: 1px solid #e5e7eb; backdrop-filter: blur(6px); display: flex; gap: 10px; z-index: 9999; }
+    .kidBtn { flex: 1; border-radius: 14px; border: 1px solid #d1d5db; background: #ffffff; color: #111827; font-weight: 1000; padding: 12px 12px; }
+    .kidBtn.active { border-color: #111827; }
+    :root { --lily-bg: #fde8f2; --lily-border: #f5b6d2; --victor-bg: #e9f2ff; --victor-border: #b7d4ff; }
+    .kidBtn.lily { background: var(--lily-bg); border-color: var(--lily-border); }
+    .kidBtn.victor { background: var(--victor-bg); border-color: var(--victor-border); }
+    .kidBtn.active.lily { background: #f9cfe3; color:#111827; }
+    .kidBtn.active.victor { background: #cfe2ff; color:#111827; }
+    #entryCard { transition: background-color .12s ease; }
+    #entryCard.saisie-lily { background: var(--lily-bg); }
+    #entryCard.saisie-victor { background: var(--victor-bg); }
+    #entryCard input, #entryCard select, #entryCard textarea { transition: background-color .12s ease; }
+    #entryCard.saisie-lily input, #entryCard.saisie-lily select, #entryCard.saisie-lily textarea { background: #fff7fb; }
+    #entryCard.saisie-victor input, #entryCard.saisie-victor select, #entryCard.saisie-victor textarea { background: #f6f9ff; }
+    .school-fields { display: none; margin-top: 10px; }
+    .school-fields.visible { display: block; }
+    .iconBtn { display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:12px; border:1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.12); color:#fff; cursor:pointer; font-size:18px; line-height:1; }
+    .iconBtn:hover { background: rgba(255,255,255,0.18); }
+    .iconBtn:active { transform: translateY(1px); }
+    .saveWrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
+    .saveMsg { font-size:12px; color:#e5e7eb; opacity:0; transform: translateY(-2px); transition: opacity .18s ease, transform .18s ease; min-height: 14px; text-align:center; max-width: 140px; line-height: 1.1; }
+    .saveMsg.show { opacity:1; transform: translateY(0); }
+    .saveMsg.ok { color:#065f46; }
+    .saveMsg.warn { color:#92400e; }
+    .filtersWrap { display:none; margin-top:10px; }
+    .filtersWrap.show { display:block; }
+    .iconOnly { width:42px; padding:8px 0; }
 
-    @media (max-width: 520px){
-      .bottom-inner { grid-template-columns: 1fr; }
-      .bottom-actions { justify-content: space-between; }
+    /* ===== PWA Install Banner ===== */
+    #installBanner {
+      display: none;
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px);
+      max-width: 480px;
+      background: linear-gradient(135deg, #1e0f46 0%, #6428b4 100%);
+      color: #fff;
+      border-radius: 18px;
+      padding: 14px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+      z-index: 999999;
+      align-items: center;
+      gap: 12px;
     }
+    #installBanner.show { display: flex; }
+    #installBanner .install-icon { font-size: 32px; flex-shrink: 0; }
+    #installBanner .install-text { flex: 1; }
+    #installBanner .install-text strong { display: block; font-size: 15px; margin-bottom: 2px; }
+    #installBanner .install-text span { font-size: 12px; opacity: 0.82; }
+    #installBanner .install-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+    #installBtn {
+      background: #ffd700; color: #1e0f46; border: 0; border-radius: 12px;
+      padding: 8px 14px; font-weight: 900; font-size: 13px; cursor: pointer; white-space: nowrap;
+    }
+    #installDismissBtn {
+      background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px; padding: 6px 10px; font-size: 11px; cursor: pointer;
+    }
+
+    /* Safe area insets for notched/island phones */
+    body { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+    /* Info icon + popup */
+    .backupInfoWrap { display:inline-flex; align-items:center; gap:6px; }
+    .infoIconBtn {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:20px; height:20px; border-radius:50%; border:1.5px solid #6b7280;
+      background:#fff; color:#6b7280; cursor:pointer; font-size:12px;
+      font-weight:900; line-height:1; padding:0; flex-shrink:0;
+      font-style:italic; font-family: Georgia, serif;
+    }
+    .infoIconBtn:hover { background:#f3f4f6; border-color:#374151; color:#374151; }
+
+    /* Modal overlay */
+    #rulesModal { display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,.45); align-items:center; justify-content:center; padding:16px; }
+    #rulesModal.open { display:flex; }
+    #rulesModalBox {
+      background:#fff; border-radius:16px; padding:20px 22px; max-width:440px; width:100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    #rulesModalBox h3 { margin:0 0 14px; font-size:16px; }
+    #rulesModalBox table { font-size:13px; }
+    #rulesModalBox th { font-size:12px; color:#374151; padding:6px 8px; }
+    #rulesModalBox td { padding:7px 8px; border-bottom:1px solid #f0f1f4; }
+    #rulesModalBox td:last-child { text-align:right; font-weight:700; color:#065f46; }
+    #rulesModalClose { margin-top:16px; width:100%; }
+
+    /* Dépense amount field highlight */
+    #amtInput.depense-mode { border-color: #fca5a5; background: #fff5f5 !important; }
   </style>
 </head>
 <body>
-<header>
-  <div class="toolbar">
-    <button class="primary" id="btnAdd">+ Ajouter</button>
-    <button id="btnHistory">Journal</button>
-    <span class="pill" id="stats">—</span>
-    <span class="pill" id="pendingInfo">0 sélectionné(s)</span>
-    <div class="save-btn-wrap" style="margin-left:auto;">
-      <div class="save-toast" id="saveToast">✅ Enregistré !</div>
-      <button class="btn-save-header" id="btnSaveChecks" title="Enregistrer (Fait)" disabled>💾</button>
+  <header><h1>R-compense</h1></header>
+
+  <div class="kidBar">
+    <button id="kidLily" class="kidBtn lily" type="button">Lily-Rose</button>
+    <button id="kidVictor" class="kidBtn victor" type="button">Victor</button>
+    <div class="saveWrap">
+      <button id="saveDiskBtn" class="iconBtn" type="button" title="Enregistrer" aria-label="Enregistrer">💾</button>
+      <div id="saveMsg" class="saveMsg" aria-live="polite"></div>
     </div>
   </div>
-</header>
 
-<main>
-  <div id="dueBanner" class="due-banner hidden" role="alert"></div>
-  <div class="list" id="list"></div>
-</main>
+  <!-- Modal règles École -->
+  <div id="rulesModal" role="dialog" aria-modal="true" aria-labelledby="rulesModalTitle">
+    <div id="rulesModalBox">
+      <h3 id="rulesModalTitle">📚 Règles — Récompense École</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>Calcul</th>
+            <th style="text-align:right;">Max</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Note = 100</td>
+            <td>Montant fixe</td>
+            <td>20 $</td>
+          </tr>
+          <tr>
+            <td>Note ≥ 85</td>
+            <td>Note − Moyenne</td>
+            <td>10 $</td>
+          </tr>
+          <tr>
+            <td>80 ≤ Note &lt; 85</td>
+            <td>(Note − Moyenne) ÷ 2</td>
+            <td>10 $</td>
+          </tr>
+          <tr>
+            <td>Note &lt; 80</td>
+            <td>—</td>
+            <td>0 $</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:#6b7280;margin:12px 0 0;">La différence Note − Moyenne doit être positive pour obtenir un montant. Le résultat est arrondi à l'entier le plus proche.</p>
 
-<!-- Bottom fixed bar -->
-<div class="bottom-bar">
-  <div class="bottom-inner">
-    <div></div>
-    <div class="bottom-actions">
-      <button class="icon-btn" id="btnExport" title="Export JSON"><span class="icon">⬇️</span></button>
-      <button class="icon-btn" id="btnImport" title="Import JSON"><span class="icon">⬆️</span></button>
-      <button class="icon-btn" id="btnClearChecks" title="Réinitialiser sélection"><span class="icon">🧹</span></button>
+      <h3 style="margin:18px 0 10px;font-size:16px;">📋 Règles — Bulletin</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th style="text-align:right;">Montant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Moyenne globale ≥ 80%</td>
+            <td>100 $</td>
+          </tr>
+          <tr>
+            <td>Chaque % de la moyenne de l'enfant au-dessus de la moyenne de classe</td>
+            <td>+5 $ / %</td>
+          </tr>
+          <tr>
+            <td>Chaque matière à 100%</td>
+            <td>+50 $</td>
+          </tr>
+          <tr>
+            <td>Moyenne globale ≥ 90%</td>
+            <td>+50 $</td>
+          </tr>
+          <tr>
+            <td>Chaque % au-dessus de 90% (moyenne globale)</td>
+            <td>+10 $ / %</td>
+          </tr>
+          <tr>
+            <td style="color:#b91c1c;">Moyenne globale &lt; 80%</td>
+            <td style="color:#b91c1c;font-weight:700;">0 $</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:#6b7280;margin:12px 0 0;">Exemple : moyenne enfant 91%, moyenne classe 80%, 1 matière à 100% → 100 $ + 55 $ + 50 $ + 50 $ + 10 $ = <strong>265 $</strong></p>
+
+      <button id="rulesModalClose" type="button">Fermer</button>
     </div>
   </div>
-  <input id="fileInput" type="file" accept="application/json,.json" class="hidden" />
-</div>
 
-<!-- Modal Ajout/Modification -->
-<dialog id="dlgEdit">
-  <div class="modal-head">
-    <strong id="dlgTitle">Ajouter</strong>
-    <button id="btnCloseEdit" aria-label="Fermer">✕</button>
-  </div>
-  <div class="modal-body">
-    <label>
-      Description <span class="count" id="descCount">0/50</span>
-      <input id="fDesc" maxlength="50" placeholder="Ex: Changer filtre fournaise" />
-    </label>
-
-    <label>
-      Nombre d'itérations (Fait)
-      <input id="fIter" type="number" disabled value="0" />
-    </label>
-
-    <label>
-      Dernier entretien
-      <input id="fDernier" type="date" disabled />
-    </label>
-
-    <label>Date de début
-      <input id="fStart" type="date" />
-    </label>
-
-    <label>Intervalle (jours)
-      <input id="fInt" type="number" min="1" step="1" placeholder="Ex: 90" />
-    </label>
-  </div>
-  <div class="modal-foot">
-    <button id="btnDelete" class="danger hidden">Supprimer</button>
-    <button id="btnCancel">Annuler</button>
-    <button id="btnSave" class="primary">Enregistrer l'item</button>
-  </div>
-</dialog>
-
-<!-- Modal Journal -->
-<dialog id="dlgHistory">
-  <div class="modal-head">
-    <strong>Journal (Historique)</strong>
-    <button id="btnCloseHist" aria-label="Fermer">✕</button>
-  </div>
-  <div class="modal-body">
-    <div class="tabs">
-      <button id="tabGlobal" class="primary">Regroupé global</button>
-      <button id="tabByItem">Par item</button>
-    </div>
-
-    <div id="viewGlobal" style="margin-top:12px; display:grid; gap:10px;"></div>
-
-    <div id="viewByItem" class="hidden" style="margin-top:12px;">
-      <select id="histItemSelect"></select>
-      <div id="histItemEvents" style="margin-top:10px; display:grid; gap:10px;"></div>
-    </div>
-
-    <div class="small" style="margin-top:12px;">
-      Astuce : Export/Import JSON te permet de sauvegarder ou restaurer tes données.
-    </div>
-  </div>
-  <div class="modal-foot">
-    <button id="btnClearHist" class="danger">Vider le journal</button>
-    <button id="btnCloseHist2" class="primary">OK</button>
-  </div>
-</dialog>
-
-<!-- Modal Modifier entrée journal -->
-<dialog id="dlgEditHist">
-  <div class="modal-head">
-    <strong>Modifier l'entrée</strong>
-    <button id="btnCloseEditHist" aria-label="Fermer">✕</button>
-  </div>
-  <div class="modal-body">
-    <label style="display:block; margin-bottom:8px; font-weight:700;">Date / heure</label>
-    <input type="datetime-local" id="ehDate" style="width:100%; box-sizing:border-box;" />
-
-    <div id="ehDueWrap" style="margin-top:12px; display:none;">
-      <label style="display:block; margin-bottom:8px; font-weight:700;">Date d'échéance (dû depuis X jours)</label>
-      <input type="date" id="ehDueDate" style="width:100%; box-sizing:border-box;" />
-      <div id="ehDuePreview" style="margin-top:4px; font-size:12px; color:#555;"></div>
-    </div>
-
-    <div id="ehDescWrap" style="margin-top:12px;">
-      <label style="display:block; margin-bottom:8px; font-weight:700;">Description de l'item</label>
-      <input type="text" id="ehDesc" style="width:100%; box-sizing:border-box;" />
-    </div>
-  </div>
-  <div class="modal-foot">
-    <button id="btnCancelEditHist">Annuler</button>
-    <button id="btnSaveEditHist" class="primary">Enregistrer</button>
-  </div>
-</dialog>
-
-<script>
-(() => {
-  // ===== Utils =====
-  const pad2 = n => String(n).padStart(2, "0");
-  const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  const fromYMD = (s) => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d, 0,0,0,0); };
-  const startOfToday = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
-  const daysBetween = (a, b) => Math.floor((b.getTime() - a.getTime()) / 86400000);
-  const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
-  const fmtDT = (ts) => new Date(ts).toLocaleString("fr-CA", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
-  const escapeHtml = (s) => s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
-
-  // ===== IndexedDB =====
-  const DB_NAME = "EntretienDB";
-  const DB_VER  = 1;
-  let db;
-
-  function openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VER);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-
-        const items = db.createObjectStore("items", { keyPath: "id" });
-        items.createIndex("by_desc", "description", { unique: false });
-
-        const checks = db.createObjectStore("checks", { keyPath: "id" });
-        checks.createIndex("by_item", "itemId", { unique: false });
-        checks.createIndex("by_ts", "dateCheck", { unique: false });
-
-        const alerts = db.createObjectStore("alerts", { keyPath: "id" });
-        alerts.createIndex("by_item", "itemId", { unique: false });
-        alerts.createIndex("by_dueKey", "dueKey", { unique: false });
-        alerts.createIndex("by_ts", "dateAlert", { unique: false });
-
-        const meta = db.createObjectStore("meta", { keyPath: "key" });
-        meta.put({ key: "seed", value: 1 });
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  function tx(storeNames, mode="readonly") {
-    const t = db.transaction(storeNames, mode);
-    return { t, stores: Object.fromEntries(storeNames.map(n => [n, t.objectStore(n)])) };
-  }
-
-  async function nextId() {
-    const { t, stores } = tx(["meta"], "readwrite");
-    return await new Promise((resolve, reject) => {
-      const get = stores.meta.get("seed");
-      get.onsuccess = () => {
-        const seed = get.result?.value ?? 1;
-        stores.meta.put({ key: "seed", value: seed + 1 });
-        t.oncomplete = () => resolve(seed);
-      };
-      get.onerror = () => reject(get.error);
-    });
-  }
-
-  function getAll(storeName, indexName=null, query=null) {
-    return new Promise((resolve, reject) => {
-      const { stores } = tx([storeName], "readonly");
-      const source = indexName ? stores[storeName].index(indexName) : stores[storeName];
-      const req = query ? source.getAll(query) : source.getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  function put(storeName, value) {
-    return new Promise((resolve, reject) => {
-      const { t, stores } = tx([storeName], "readwrite");
-      stores[storeName].put(value);
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-    });
-  }
-
-  async function deleteItemCascade(itemId) {
-    const checks = await getAll("checks", "by_item", itemId);
-    const alerts = await getAll("alerts", "by_item", itemId);
-
-    const { t, stores } = tx(["items","checks","alerts"], "readwrite");
-    stores.items.delete(itemId);
-    checks.forEach(c => stores.checks.delete(c.id));
-    alerts.forEach(a => stores.alerts.delete(a.id));
-
-    return await new Promise((resolve, reject) => {
-      t.oncomplete = () => resolve();
-      t.onerror = () => reject(t.error);
-    });
-  }
-
-  async function deleteChecksForItem(itemId) {
-    const list = await getAll("checks", "by_item", itemId);
-    if (!list.length) return;
-    const { t, stores } = tx(["checks"], "readwrite");
-    list.forEach(c => stores.checks.delete(c.id));
-    return await new Promise((resolve, reject) => {
-      t.oncomplete = resolve;
-      t.onerror = () => reject(t.error);
-    });
-  }
-
-  async function clearAllData() {
-    const { t, stores } = tx(["items","checks","alerts"], "readwrite");
-    stores.items.clear();
-    stores.checks.clear();
-    stores.alerts.clear();
-    return await new Promise((resolve, reject) => {
-      t.oncomplete = resolve;
-      t.onerror = () => reject(t.error);
-    });
-  }
-
-  // ===== Business logic =====
-  async function lastCheckTs(itemId) {
-    const list = await getAll("checks", "by_item", itemId);
-    if (!list.length) return null;
-    list.sort((a,b)=>b.dateCheck - a.dateCheck);
-    return list[0].dateCheck;
-  }
-
-  async function computeStatus(item) {
-    const today = startOfToday();
-    const last = await lastCheckTs(item.id);
-
-    const refDate = last ? new Date(last) : fromYMD(item.dateDebut);
-    refDate.setHours(0,0,0,0);
-
-    const dueDate = addDays(refDate, Number(item.intervalJours));
-    dueDate.setHours(0,0,0,0);
-
-    const daysDue = Math.max(0, daysBetween(dueDate, today));
-    const isDue = today.getTime() >= dueDate.getTime();
-
-    return {
-      lastTs: last,
-      refYMD: toYMD(refDate),
-      dueDate,
-      isDue,
-      daysDue
-    };
-  }
-
-  async function ensureAlertLogged(item, status) {
-    if (!status.isDue) return;
-    const dueYMD = toYMD(status.dueDate);
-    const dueKey = `${item.id}|${dueYMD}`;
-    const all = await getAll("alerts");
-    if (all.some(a => a.dueKey === dueKey)) return;
-
-    const id = await nextId();
-    await put("alerts", { id, itemId: item.id, dueKey, dueDateYMD: dueYMD, dateAlert: Date.now() });
-  }
-
-  // ===== Toast =====
-  let toastTimer = null;
-  const saveToast = document.querySelector("#saveToast");
-
-  function showSaveToast() {
-    if (toastTimer) clearTimeout(toastTimer);
-    saveToast.classList.add("visible");
-    toastTimer = setTimeout(() => {
-      saveToast.classList.remove("visible");
-      toastTimer = null;
-    }, 3000);
-  }
-
-  // ===== UI refs =====
-  const elList = document.querySelector("#list");
-  const elStats = document.querySelector("#stats");
-  const dueBanner = document.querySelector("#dueBanner");
-
-  const pendingInfo = document.querySelector("#pendingInfo");
-  const btnSaveChecks = document.querySelector("#btnSaveChecks");
-  const btnClearChecks = document.querySelector("#btnClearChecks");
-
-  const btnExport = document.querySelector("#btnExport");
-  const btnImport = document.querySelector("#btnImport");
-  const fileInput = document.querySelector("#fileInput");
-
-  // Edit modal
-  const dlgEdit = document.querySelector("#dlgEdit");
-  const dlgTitle = document.querySelector("#dlgTitle");
-  const fDesc = document.querySelector("#fDesc");
-  const fIter = document.querySelector("#fIter");
-  const fDernier = document.querySelector("#fDernier");
-  const fStart = document.querySelector("#fStart");
-  const fInt = document.querySelector("#fInt");
-  const descCount = document.querySelector("#descCount");
-  const btnDelete = document.querySelector("#btnDelete");
-
-  // History modal
-  const dlgHistory = document.querySelector("#dlgHistory");
-  const viewGlobal = document.querySelector("#viewGlobal");
-  const viewByItem = document.querySelector("#viewByItem");
-  const histItemSelect = document.querySelector("#histItemSelect");
-  const histItemEvents = document.querySelector("#histItemEvents");
-
-  let selectedRowIndex = -1;
-  let currentRows = [];
-  let editingId = null;
-
-  // Batch selection (checkboxes)
-  const pending = new Set();
-
-  function setDescCount() { descCount.textContent = `${fDesc.value.length}/50`; }
-  fDesc.addEventListener("input", setDescCount);
-
-  async function openEdit(item=null) {
-    editingId = item ? item.id : null;
-    dlgTitle.textContent = item ? "Modifier" : "Ajouter";
-    fDesc.value = item ? item.description : "";
-    fStart.value = item ? item.dateDebut : toYMD(startOfToday());
-    fInt.value = item ? item.intervalJours : "30";
-    setDescCount();
-    btnDelete.classList.toggle("hidden", !item);
-
-    if (!item) {
-      fIter.value = 0;
-      fDernier.value = fStart.value;
-    } else {
-      const checks = await getAll("checks", "by_item", item.id);
-      fIter.value = checks.length;
-
-      const last = await lastCheckTs(item.id);
-      fDernier.value = last ? toYMD(new Date(last)) : item.dateDebut;
-    }
-
-    dlgEdit.showModal();
-    setTimeout(()=>fDesc.focus(), 50);
-  }
-
-  function closeEdit() { dlgEdit.close(); }
-
-  async function saveEdit() {
-    const description = fDesc.value.trim();
-    if (!description) return alert("Description requise.");
-    if (description.length > 50) return alert("Max 50 caractères.");
-
-    const dateDebut = fStart.value;
-    if (!dateDebut) return alert("Date de début requise.");
-
-    const intervalJours = Number(fInt.value);
-    if (!Number.isFinite(intervalJours) || intervalJours < 1) return alert("Intervalle (jours) doit être >= 1.");
-
-    if (editingId == null) {
-      const id = await nextId();
-      await put("items", { id, description, dateDebut, intervalJours });
-    } else {
-      const old = (await getAll("items")).find(x => x.id === editingId);
-      const dateChanged = old && old.dateDebut !== dateDebut;
-      const intChanged  = old && Number(old.intervalJours) !== Number(intervalJours);
-
-      if (dateChanged || intChanged) {
-        const existingChecks = await getAll("checks", "by_item", editingId);
-        if (existingChecks.length > 0) {
-          const okReset = confirm(
-            "Tu as modifié la date de début et/ou l'intervalle.\n\n" +
-            "Veux-tu RÉINITIALISER le compteur (supprimer l'historique 'Fait')\n" +
-            "pour recalculer la prochaine date à partir de la nouvelle date de début ?"
-          );
-          if (okReset) {
-            await deleteChecksForItem(editingId);
-            fIter.value = 0;
-            fDernier.value = dateDebut;
-          }
-        }
-      }
-
-      await put("items", { id: editingId, description, dateDebut, intervalJours });
-    }
-
-    closeEdit();
-    await render();
-  }
-
-  async function doDelete() {
-    if (editingId == null) return;
-    const ok = confirm("Supprimer cet item (et son journal) ?");
-    if (!ok) return;
-    await deleteItemCascade(editingId);
-    pending.delete(editingId);
-    closeEdit();
-    await render();
-  }
-
-  function selectRow(i) {
-    selectedRowIndex = i;
-    [...elList.querySelectorAll(".row")].forEach((r, idx) => r.classList.toggle("selected", idx === i));
-  }
-
-  function updatePendingInfo() {
-    pendingInfo.textContent = `${pending.size} sélectionné(s)`;
-    btnSaveChecks.disabled = pending.size === 0;
-  }
-
-  async function savePendingChecks() {
-    if (pending.size === 0) return;
-
-    const now = Date.now();
-    for (const itemId of pending) {
-      const id = await nextId();
-      await put("checks", { id, itemId, dateCheck: now });
-    }
-
-    pending.clear();
-    updatePendingInfo();
-    await render();
-    showSaveToast();
-  }
-
-  function renderDueBanner(dueRows) {
-    if (!dueRows.length) {
-      dueBanner.classList.add("hidden");
-      dueBanner.innerHTML = "";
-      return;
-    }
-
-    dueRows.sort((a,b)=>a.st.dueDate - b.st.dueDate);
-
-    const itemsHtml = dueRows.slice(0, 20).map(r => {
-      const dueYMD = toYMD(r.st.dueDate);
-      return `<li><strong>${escapeHtml(r.item.description)}</strong> — dû le <strong>${dueYMD}</strong> (retard: ${r.st.daysDue} j)</li>`;
-    }).join("");
-
-    const more = dueRows.length - Math.min(20, dueRows.length);
-    const moreHtml = more > 0 ? `<div class="small" style="margin-top:8px;">… et ${more} autre(s) élément(s) dû(s).</div>` : "";
-
-    dueBanner.innerHTML = `
-      <div class="t">⚠️ Entretien(s) dû(s) (${dueRows.length})</div>
-      <ul>${itemsHtml}</ul>
-      ${moreHtml}
-    `;
-    dueBanner.classList.remove("hidden");
-  }
-
-  async function render() {
-    const items = await getAll("items");
-
-    const computed = [];
-    for (const it of items) {
-      const st = await computeStatus(it);
-      await ensureAlertLogged(it, st);
-      computed.push({ item: it, st });
-    }
-
-    computed.sort((a,b) => {
-      if (a.st.isDue !== b.st.isDue) return a.st.isDue ? -1 : 1;
-      return a.st.dueDate - b.st.dueDate;
-    });
-
-    currentRows = computed;
-
-    const dueRows = computed.filter(r => r.st.isDue);
-    renderDueBanner(dueRows);
-
-    elStats.textContent = `${computed.length} item(s) • ${dueRows.length} DU`;
-
-    elList.innerHTML = "";
-    computed.forEach(({item, st}, idx) => {
-      const today = startOfToday();
-      const daysRemaining = daysBetween(today, st.dueDate);
-      const remainLabel = st.isDue
-        ? `Retard de ${st.daysDue} jour(s)`
-        : daysRemaining === 0
-          ? `Aujourd'hui`
-          : `Il reste ${daysRemaining} jour(s)`;
-      const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
-
-      const row = document.createElement("div");
-      row.className = "row";
-      row.tabIndex = 0;
-
-      row.innerHTML = `
-        <div class="chk-wrap">
-          <input type="checkbox" aria-label="Check fait" ${pending.has(item.id) ? "checked" : ""}/>
+  <main>
+    <section class="card" id="entryCard">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="font-weight:1000;">
+          Saisie
+          <span id="editBadge" class="badgeEdit" style="display:none;">MODE MODIFICATION</span>
+        </div>
+        <div class="muted" id="dbInfo"></div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Date <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+          <input id="dateInput" type="date" />
         </div>
         <div>
-          <div class="desc">${escapeHtml(item.description)}</div>
-          <div class="meta">
-            <div class="meta-line">
-              <span><span class="k">Dernier:</span> <span class="v">${st.refYMD}</span></span>
-              <span>•</span>
-              <span><span class="k">Intervalle:</span> <span class="v">${item.intervalJours}</span> <span class="k">jour(s)</span></span>
-              <span>•</span>
-              <span><span class="k v">${remainLabel}</span></span>
-            </div>
+          <label>Catégorie <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+          <select id="catSelect"></select>
+        </div>
+      </div>
+
+      <!-- Champs spécifiques pour la catégorie "école" -->
+      <div id="schoolFields" class="school-fields">
+        <div style="margin-top:10px;">
+          <label>Matière <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+          <select id="matiereSelect"></select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label>Note <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+            <input id="noteInput" type="number" step="1" min="0" max="100" placeholder="0" />
+          </div>
+          <div>
+            <label>Moyenne <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+            <input id="moyenneInput" type="number" step="1" min="0" max="100" placeholder="0" />
           </div>
         </div>
-        <div class="actions">
-          ${badge}
-          <button title="Modifier">✏️</button>
-          <button class="danger" title="Supprimer">🗑️</button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Montant <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+          <input id="amtInput" type="number" step="1" inputmode="numeric" placeholder="0" />
+          <div id="amtHint" class="hint" style="display:none;">⬇️ Dépense — sera soustrait automatiquement (signe − facultatif)</div>
         </div>
-      `;
+        <div>
+          <label>Description <span style="color:#b91c1c; font-size:11px;">obligatoire</span></label>
+          <input id="descInput" type="text" maxlength="100" />
+          <div class="hint"><span id="descCount">0</span>/100</div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:12px;">
+        <button id="cancelEditBtn" class="secondary" type="button" style="display:none;">Annuler modif</button>
+      </div>
+      <div style="margin-top:8px;" class="muted" id="backupInfoWrap">
+        <span id="backupInfo"></span>
+        <button id="rulesInfoBtn" class="infoIconBtn" type="button" title="Voir les règles de récompense École" aria-label="Règles École" style="display:none;">i</button>
+      </div>
+      <p class="muted" id="statusMsg" style="margin:10px 0 0;"></p>
+    </section>
+
+    <section class="card">
+      <details id="txDetails" open>
+        <summary>Historique (transactions)</summary>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <div class="muted">
+            <span id="rowsCount"></span> • Total filtre: <span id="filteredTotal" style="font-weight:1000;"></span>
+          </div>
+          <button id="toggleFiltersBtn" class="secondary smallBtn iconOnly" type="button" title="Afficher/masquer les filtres" aria-label="Filtres"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></button>
+        </div>
+
+        <div id="filtersWrap" class="filtersWrap">
+          <div class="toolbar" style="margin-top:10px;">
+            <div>
+              <label>Filtrer (enfant) — multi</label>
+              <select id="filterChild" multiple size="3"></select>
+              <div class="hint">Android: touche pour sélectionner, retouche pour désélectionner.</div>
+            </div>
+            <div>
+              <label>Filtrer (catégorie) — multi</label>
+              <select id="filterCat" multiple size="5"></select>
+            </div>
+            <div>
+              <label>Description contient</label>
+              <input id="filterDesc" type="text" placeholder="ex: lunch, défi..." />
+            </div>
+            <div>
+              <label>Date début</label>
+              <input id="fromDate" type="date" />
+            </div>
+            <div>
+              <label>Date fin</label>
+              <input id="toDate" type="date" />
+            </div>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button id="applyFilterBtn" class="secondary smallBtn iconOnly" type="button" title="Appliquer filtres" aria-label="Appliquer filtres">✓</button>
+            <button id="clearFilterBtn" class="secondary smallBtn iconOnly" type="button" title="Effacer filtres" aria-label="Effacer filtres">🧹</button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto; margin-top:10px;">
+          <table>
+            <thead>
+              <tr>
+                <th><button data-sort="child" class="smallBtn secondary" type="button">Enfant</button></th>
+                <th><button data-sort="date" class="smallBtn secondary" type="button">Date</button></th>
+                <th><button data-sort="category" class="smallBtn secondary" type="button">Catégorie</button></th>
+                <th><button data-sort="matiere" class="smallBtn secondary" type="button">Matière</button></th>
+                <th class="right"><button data-sort="amount" class="smallBtn secondary" type="button">Montant</button></th>
+                <th>Description</th>
+                <th style="width:160px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="txBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Journal des actions</summary>
+        <div style="margin-top:10px; overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th class="right">Montant</th>
+                <th>Détails</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="clearLogBtn" class="danger" type="button">Vider journal</button>
+          <button id="exportLogBtn" class="secondary" type="button">Export journal (JSON)</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Paramètres (catégories, matières, backup)</summary>
+
+        <div style="margin-top:10px;">
+          <label>Catégories (une par ligne)</label>
+          <textarea id="catsCfg"></textarea>
+        </div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveCfgBtn" class="secondary" type="button">Enregistrer catégories</button>
+          <button id="resetCfgBtn" class="secondary" type="button">Remettre par défaut</button>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e5e7eb;margin:14px 0;" />
+
+        <div>
+          <label>Matières — École (une par ligne)</label>
+          <textarea id="matieresCfg"></textarea>
+          <div class="hint">Ces matières apparaissent dans le champ "Matière" lors de la saisie d'une transaction École.</div>
+        </div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveMatieresCfgBtn" class="secondary" type="button">Enregistrer matières</button>
+          <button id="resetMatieresCfgBtn" class="secondary" type="button">Remettre par défaut</button>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e5e7eb;margin:14px 0;" />
+
+        <div class="row">
+          <div>
+            <label>Rappel backup (jours)</label>
+            <input id="backupDays" type="number" min="1" step="1" />
+            <div class="hint">Ex: 7 = rappel si aucun backup depuis 7 jours.</div>
+          </div>
+          <div>
+            <label>Dernier backup</label>
+            <input id="lastBackupDisplay" type="text" disabled />
+            <div class="hint">Mis à jour quand tu fais "Backup auto".</div>
+          </div>
+        </div>
+        <div class="actions" style="margin-top:10px;">
+          <button id="saveBackupCfgBtn" class="secondary" type="button">Enregistrer rappel</button>
+          <button id="backupNowBtn2" class="secondary" type="button">Backup auto (JSON + CSV)</button>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="actions">
+        <button id="exportBtn" class="secondary" type="button">Export</button>
+        <button id="importBtn" class="secondary" type="button">Import</button>
+      </div>
+      <input id="importFile" type="file" accept="application/json" style="display:none;" />
+    </section>
+  </main>
+
+  <!-- PWA Install Banner -->
+  <div id="installBanner" role="complementary" aria-label="Installer l'application">
+    <div class="install-icon">⭐</div>
+    <div class="install-text">
+      <strong>Installer R-compense</strong>
+      <span>Accès rapide, fonctionne hors-ligne</span>
+    </div>
+    <div class="install-actions">
+      <button id="installBtn" type="button">Installer</button>
+      <button id="installDismissBtn" type="button">Plus tard</button>
+    </div>
+  </div>
 
-      row.addEventListener("click", (e) => {
-        if (e.target && e.target.tagName === "INPUT") return;
-        selectRow(idx);
-      });
-
-      const chk = row.querySelector('input[type="checkbox"]');
-      chk.addEventListener("change", () => {
-        if (chk.checked) pending.add(item.id);
-        else pending.delete(item.id);
-        updatePendingInfo();
-      });
-
-      const btnEdit = row.querySelectorAll(".actions button")[0];
-      const btnDel  = row.querySelectorAll(".actions button")[1];
-
-      btnEdit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(item); });
-      btnDel.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const ok = confirm(`Supprimer (et journal) :\n\n${item.description} ?`);
-        if (!ok) return;
-        await deleteItemCascade(item.id);
-        pending.delete(item.id);
-        updatePendingInfo();
-        await render();
-      });
-
-      elList.appendChild(row);
-    });
-
-    if (computed.length === 0) selectedRowIndex = -1;
-    else if (selectedRowIndex >= computed.length) selectedRowIndex = computed.length - 1;
-    if (selectedRowIndex >= 0) selectRow(selectedRowIndex);
-
-    updatePendingInfo();
-  }
-
-  // Keyboard navigation
-  document.addEventListener("keydown", (e) => {
-    if (dlgEdit.open || dlgHistory.open) return;
-    const rows = [...elList.querySelectorAll(".row")];
-    if (!rows.length) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      const i = Math.min(rows.length - 1, Math.max(0, selectedRowIndex + 1));
-      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const i = Math.max(0, selectedRowIndex - 1);
-      selectRow(i); rows[i].scrollIntoView({ block: "nearest" });
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const cur = currentRows[selectedRowIndex];
-      if (cur) openEdit(cur.item);
-    } else if (e.key === " ") {
-      e.preventDefault();
-      const row = rows[selectedRowIndex];
-      if (!row) return;
-      const chk = row.querySelector('input[type="checkbox"]');
-      chk.checked = !chk.checked;
-      chk.dispatchEvent(new Event("change"));
-    }
-  });
-
-  // Buttons - top
-  document.querySelector("#btnAdd").addEventListener("click", () => openEdit(null));
-  document.querySelector("#btnCloseEdit").addEventListener("click", closeEdit);
-  document.querySelector("#btnCancel").addEventListener("click", closeEdit);
-  document.querySelector("#btnSave").addEventListener("click", saveEdit);
-  document.querySelector("#btnDelete").addEventListener("click", doDelete);
-
-  // Buttons - bottom
-  btnSaveChecks.addEventListener("click", savePendingChecks);
-  btnClearChecks.addEventListener("click", () => { pending.clear(); updatePendingInfo(); render(); });
-
-  // ===== Export / Import JSON =====
-  btnExport.addEventListener("click", exportJSON);
-  btnImport.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", onImportFileChosen);
-
-  async function exportJSON() {
-    const items = await getAll("items");
-    const checks = await getAll("checks");
-    const alerts = await getAll("alerts");
-
-    const payload = {
-      app: "Entretien",
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      data: { items, checks, alerts }
-    };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `entretien-backup-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  async function onImportFileChosen() {
-    const file = fileInput.files?.[0];
-    fileInput.value = "";
-    if (!file) return;
-
-    const text = await file.text();
-    let json;
-    try { json = JSON.parse(text); }
-    catch { alert("Fichier JSON invalide."); return; }
-
-    if (!json || json.app !== "Entretien" || !json.data) {
-      alert("Ce JSON ne semble pas être un backup Entretien.");
-      return;
-    }
-
-    const items = json.data.items || [];
-    const checks = json.data.checks || [];
-    const alerts = json.data.alerts || [];
-
-    const ok = confirm(
-      `Importer backup ?\n\nItems: ${items.length}\nChecks: ${checks.length}\nAlertes: ${alerts.length}\n\n` +
-      `⚠️ OK = REMPLACER toutes les données actuelles.`
-    );
-    if (!ok) return;
-
-    await clearAllData();
-    for (const it of items) await put("items", it);
-    for (const c of checks) await put("checks", c);
-    for (const a of alerts) await put("alerts", a);
-
-    const maxId = Math.max(0, ...items.map(x => x.id||0), ...checks.map(x => x.id||0), ...alerts.map(x => x.id||0));
-    const { t, stores } = tx(["meta"], "readwrite");
-    stores.meta.put({ key: "seed", value: maxId + 1 });
-    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
-
-    pending.clear();
-    updatePendingInfo();
-    await render();
-    alert("Import terminé ✅");
-  }
-
-  // ===== Journal (History) =====
-  document.querySelector("#btnHistory").addEventListener("click", openHistory);
-  document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
-  document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
-
-  document.querySelector("#tabGlobal").addEventListener("click", () => setHistTab("global"));
-  document.querySelector("#tabByItem").addEventListener("click", () => setHistTab("item"));
-
-  function setHistTab(which) {
-    const isGlobal = which === "global";
-    viewGlobal.classList.toggle("hidden", !isGlobal);
-    viewByItem.classList.toggle("hidden", isGlobal);
-    document.querySelector("#tabGlobal").classList.toggle("primary", isGlobal);
-    document.querySelector("#tabByItem").classList.toggle("primary", !isGlobal);
-  }
-
-  async function openHistory() {
-    await renderHistoryGlobal();
-    await renderHistoryItemPicker();
-    setHistTab("global");
-    dlgHistory.showModal();
-  }
-
-  async function renderHistoryGlobal() {
-    const items = await getAll("items");
-    const byId = Object.fromEntries(items.map(i => [i.id, i.description]));
-
-    const checks = await getAll("checks");
-    const alerts = await getAll("alerts");
-
-    const events = [];
-    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck, itemId:c.itemId }));
-    alerts.forEach(a => {
-      const dueDate = fromYMD(a.dueDateYMD);
-      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
-      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
-      events.push({ type:"alert", ts:a.dateAlert, itemId:a.itemId, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
-    });
-    events.sort((a,b)=>b.ts - a.ts);
-
-    viewGlobal.innerHTML = events.length ? "" : `<div class="hist-item">Aucun journal.</div>`;
-    for (const ev of events.slice(0, 300)) {
-      const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
-      const box = document.createElement("div");
-      box.className = "hist-item";
-      box.innerHTML = (ev.type === "done")
-        ? `<div class="t">✅ Fait — ${escapeHtml(desc)}</div><div class="s">${fmtDT(ev.ts)}</div>`
-        : `<div class="t">🚨 Alerte — ${escapeHtml(desc)} — dû depuis ${ev.extra.daysDue} j</div>
-           <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
-      const actions = document.createElement("div");
-      actions.className = "hist-actions";
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "btn-edit-hist";
-      btnEdit.textContent = "✏️ Modifier";
-      btnEdit.addEventListener("click", () => editHistEntry(ev));
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn-del-hist";
-      btnDel.textContent = "🗑 Supprimer";
-      btnDel.addEventListener("click", () => deleteHistEntry(ev));
-      actions.appendChild(btnEdit);
-      actions.appendChild(btnDel);
-      box.appendChild(actions);
-      viewGlobal.appendChild(box);
-    }
-  }
-
-  async function renderHistoryItemPicker() {
-    const items = await getAll("items");
-    histItemSelect.innerHTML = "";
-    items.sort((a,b)=>a.description.localeCompare(b.description,"fr")).forEach(it => {
-      const opt = document.createElement("option");
-      opt.value = String(it.id);
-      opt.textContent = it.description;
-      histItemSelect.appendChild(opt);
-    });
-    histItemSelect.onchange = renderHistoryForSelectedItem;
-    await renderHistoryForSelectedItem();
-  }
-
-  async function renderHistoryForSelectedItem() {
-    const itemId = Number(histItemSelect.value);
-    if (!itemId) { histItemEvents.innerHTML = ""; return; }
-
-    const item = (await getAll("items")).find(x => x.id === itemId);
-    const checks = await getAll("checks", "by_item", itemId);
-    const alerts = await getAll("alerts", "by_item", itemId);
-
-    const events = [];
-    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck }));
-    alerts.forEach(a => {
-      const dueDate = fromYMD(a.dueDateYMD);
-      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
-      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
-      events.push({ type:"alert", ts:a.dateAlert, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
-    });
-    events.sort((a,b)=>b.ts - a.ts);
-
-    histItemEvents.innerHTML = "";
-    const title = document.createElement("div");
-    title.className = "hist-item";
-    title.innerHTML = `<div class="t">📌 ${escapeHtml(item?.description ?? "")}</div>`;
-    histItemEvents.appendChild(title);
-
-    if (!events.length) {
-      const empty = document.createElement("div");
-      empty.className = "hist-item";
-      empty.textContent = "Aucun événement pour cet item.";
-      histItemEvents.appendChild(empty);
-      return;
-    }
-
-    for (const ev of events.slice(0, 300)) {
-      const box = document.createElement("div");
-      box.className = "hist-item";
-      box.innerHTML = (ev.type === "done")
-        ? `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`
-        : `<div class="t">🚨 Alerte — dû depuis ${ev.extra.daysDue} j</div>
-           <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
-      const actions = document.createElement("div");
-      actions.className = "hist-actions";
-      const btnEdit = document.createElement("button");
-      btnEdit.className = "btn-edit-hist";
-      btnEdit.textContent = "✏️ Modifier";
-      btnEdit.addEventListener("click", () => editHistEntry({ ...ev, itemId: itemId }));
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn-del-hist";
-      btnDel.textContent = "🗑 Supprimer";
-      btnDel.addEventListener("click", () => deleteHistEntry({ ...ev, itemId: itemId }));
-      actions.appendChild(btnEdit);
-      actions.appendChild(btnDel);
-      box.appendChild(actions);
-      histItemEvents.appendChild(box);
-    }
-  }
-
-  // ===== Edit / Delete journal entries =====
-  async function findRecordByEvent(ev) {
-    const store = ev.type === "done" ? "checks" : "alerts";
-    const tsField = ev.type === "done" ? "dateCheck" : "dateAlert";
-    const all = await getAll(store, "by_item", ev.itemId);
-    return { store, tsField, record: all.find(r => r[tsField] === ev.ts) };
-  }
-
-  async function deleteHistEntry(ev) {
-    const { store, record } = await findRecordByEvent(ev);
-    if (!record) { alert("Entrée introuvable."); return; }
-    const label = ev.type === "done" ? "Fait" : "Alerte";
-    const dlgHistory = document.querySelector("#dlgHistory");
-    const histWasOpen = dlgHistory.open;
-    if (histWasOpen) dlgHistory.close();
-    if (!confirm(`Supprimer cette entrée du journal ?\n\n${label} — ${fmtDT(ev.ts)}`)) {
-      if (histWasOpen) dlgHistory.showModal();
-      return;
-    }
-    const { t, stores } = tx([store], "readwrite");
-    stores[store].delete(record.id);
-    await new Promise((res, rej) => { t.oncomplete = res; t.onerror = () => rej(t.error); });
-    await refreshHistAndMain();
-    if (histWasOpen) dlgHistory.showModal();
-  }
-
-  async function editHistEntry(ev) {
-    const { store, tsField, record } = await findRecordByEvent(ev);
-    if (!record) { alert("Entrée introuvable."); return; }
-
-    // Load item for description editing
-    const items = await getAll("items");
-    const item = items.find(i => i.id === ev.itemId);
-
-    const dlg = document.querySelector("#dlgEditHist");
-    const ehDate = document.querySelector("#ehDate");
-    const ehDueWrap = document.querySelector("#ehDueWrap");
-    const ehDueDate = document.querySelector("#ehDueDate");
-    const ehDuePreview = document.querySelector("#ehDuePreview");
-    const ehDesc = document.querySelector("#ehDesc");
-
-    // Populate date/time
-    const current = new Date(ev.ts);
-    ehDate.value = toLocalISO(current);
-
-    // Show due date field only for alerts
-    if (ev.type === "alert") {
-      ehDueWrap.style.display = "block";
-      ehDueDate.value = record.dueDateYMD;
-      updateDuePreview();
-      ehDueDate.oninput = updateDuePreview;
-      ehDate.oninput = updateDuePreview;
-    } else {
-      ehDueWrap.style.display = "none";
-      ehDueDate.oninput = null;
-      ehDate.oninput = null;
-    }
-
-    function updateDuePreview() {
-      const due = fromYMD(ehDueDate.value);
-      const alertD = new Date(ehDate.value);
-      if (!isNaN(due) && !isNaN(alertD)) {
-        alertD.setHours(0,0,0,0);
-        const days = Math.max(0, daysBetween(due, alertD));
-        ehDuePreview.textContent = `→ dû depuis ${days} jour(s)`;
-      } else {
-        ehDuePreview.textContent = "";
-      }
-    }
-
-    // Populate description
-    ehDesc.value = item ? item.description : "";
-
-    // Close history dialog first to avoid stacked modals
-    const dlgHistory = document.querySelector("#dlgHistory");
-    const histWasOpen = dlgHistory.open;
-    if (histWasOpen) dlgHistory.close();
-
-    dlg.showModal();
-
-    // Wait for user action
-    const result = await new Promise(resolve => {
-      function onSave() { cleanup(); resolve("save"); }
-      function onCancel() { cleanup(); resolve("cancel"); }
-      function cleanup() {
-        document.querySelector("#btnSaveEditHist").removeEventListener("click", onSave);
-        document.querySelector("#btnCancelEditHist").removeEventListener("click", onCancel);
-        document.querySelector("#btnCloseEditHist").removeEventListener("click", onCancel);
-      }
-      document.querySelector("#btnSaveEditHist").addEventListener("click", onSave);
-      document.querySelector("#btnCancelEditHist").addEventListener("click", onCancel);
-      document.querySelector("#btnCloseEditHist").addEventListener("click", onCancel);
-    });
-
-    dlg.close();
-
-    if (result !== "save") {
-      // Reopen history if it was open before
-      if (histWasOpen) { dlgHistory.showModal(); await renderHistoryGlobal(); await renderHistoryItemPicker(); }
-      return;
-    }
-
-    // Validate & save date
-    const parsedDate = new Date(ehDate.value);
-    if (isNaN(parsedDate.getTime())) { alert("Date invalide."); return; }
-    record[tsField] = parsedDate.getTime();
-
-    // Save due date for alerts
-    if (ev.type === "alert") {
-      const newDue = ehDueDate.value;
-      if (!newDue) { alert("Date d'échéance invalide."); return; }
-      record.dueDateYMD = newDue;
-      record.dueKey = `${ev.itemId}|${newDue}`;
-    }
-
-    await put(store, record);
-
-    // Save description if changed
-    if (item && ehDesc.value.trim() && ehDesc.value.trim() !== item.description) {
-      item.description = ehDesc.value.trim();
-      await put("items", item);
-    }
-
-    await refreshHistAndMain();
-    // Reopen history dialog
-    if (histWasOpen) dlgHistory.showModal();
-  }
-
-  function toLocalISO(d) {
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  }
-
-  async function refreshHistAndMain() {
-    await renderHistoryGlobal();
-    await renderHistoryItemPicker();
-    await render();
-  }
-
-  document.querySelector("#btnClearHist").addEventListener("click", async () => {
-    const ok = confirm("Vider tout le journal (Fait + Alertes) ? Les items restent.");
-    if (!ok) return;
-
-    const { t, stores } = tx(["checks","alerts"], "readwrite");
-    stores.checks.clear();
-    stores.alerts.clear();
-    await new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
-
-    pending.clear();
-    updatePendingInfo();
-    await renderHistoryGlobal();
-    await render();
-  });
-
-  // Init / refresh
-  setInterval(render, 5 * 60 * 1000);
-  (async function init() {
-    db = await openDB();
-    updatePendingInfo();
-    await render();
-  })();
-
-})();
-</script>
-
-<!-- ============================================================
-     PWA — Service Worker + Bannière d'installation
-     ============================================================ -->
 <script>
-(function () {
-  // ── 1. Enregistrement du Service Worker ──────────────────────
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => {
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateToast();
-              }
-            });
-          });
-        })
-        .catch(err => console.warn('SW registration failed:', err));
-    });
+const FIXED_KIDS = ["Lily-Rose", "Victor"];
+const DEFAULT_CATS = ["Tâches ménagères","Comportement","Devoirs","École","Dépense","Gâterie","Éducation financière"];
+const DEBIT_CATS = ["Dépense"]; // Catégories dont le montant est automatiquement négatif
+const DEFAULT_MATIERES = ["Danse","Éducation physique","Espagnol","Français","Histoire","Mathématique","Science"];
+const DB_NAME = "BudgetEnfantsDB_v2";
+const DB_VERSION = 2;
+const STORE_CONFIG = "config";
+const STORE_TX = "transactions";
+const STORE_LOG = "log";
+
+let db = null;
+let CFG = {
+  kids: FIXED_KIDS,
+  cats: DEFAULT_CATS,
+  matieres: DEFAULT_MATIERES,
+  defaults: { kid: null, cat: "Tâches ménagères" },
+  backup: { intervalDays: 7, lastBackupTs: null }
+};
+let ALL_DATA = [];
+let ACTIVE_CHILD = null;
+let FILTER = { children: [], cats: [], desc: "", from: "", to: "" };
+let SORT = { col: "date", dir: "desc" };
+let EDIT_MODE = false;
+let EDIT_ID = null;
+let SAVE_MSG_TIMER = null;
+const $ = (id) => document.getElementById(id);
+
+function isDebitCat(cat) {
+  return DEBIT_CATS.map(c => c.toLowerCase().trim()).includes((cat || "").toLowerCase().trim());
+}
+
+function nowISO() { return new Date().toISOString(); }
+function todayISO() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function formatDateHuman(isoDate) {
+  if (!isoDate) return "";
+  const d = new Date(isoDate);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function formatTS(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/* ========================= IndexedDB ========================= */
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_CONFIG)) db.createObjectStore(STORE_CONFIG, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(STORE_TX)) {
+        const txStore = db.createObjectStore(STORE_TX, { keyPath: "id", autoIncrement: true });
+        txStore.createIndex("child", "child", { unique: false });
+        txStore.createIndex("date", "date", { unique: false });
+        txStore.createIndex("category", "category", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_LOG)) db.createObjectStore(STORE_LOG, { keyPath: "id", autoIncrement: true });
+    };
+  });
+}
+async function dbGet(store, key) {
+  const tx = db.transaction(store, "readonly");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).get(key); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+async function dbPut(store, obj) {
+  const tx = db.transaction(store, "readwrite");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).put(obj); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+async function dbAdd(store, obj) {
+  const tx = db.transaction(store, "readwrite");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).add(obj); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+async function dbDelete(store, id) {
+  const tx = db.transaction(store, "readwrite");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
+}
+async function dbGetAll(store) {
+  const tx = db.transaction(store, "readonly");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+async function dbClear(store) {
+  const tx = db.transaction(store, "readwrite");
+  return new Promise((res, rej) => { const r = tx.objectStore(store).clear(); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
+}
+
+/* ========================= Config ========================= */
+async function loadConfig() {
+  const obj = await dbGet(STORE_CONFIG, "main");
+  if (obj && obj.data) return obj.data;
+  return { kids: FIXED_KIDS, cats: DEFAULT_CATS, matieres: DEFAULT_MATIERES, defaults: { kid: null, cat: DEFAULT_CATS[0] }, backup: { intervalDays: 7, lastBackupTs: null } };
+}
+async function saveConfig(cfg) { await dbPut(STORE_CONFIG, { id: "main", data: cfg }); }
+
+/* ========================= Logging ========================= */
+async function logAction(actionName, amount, details) {
+  await dbAdd(STORE_LOG, { ts: Date.now(), action: actionName, amount: amount, details: details || "" });
+}
+
+/* ========================= UI Helpers ========================= */
+function setStatus(msg) {
+  $("statusMsg").textContent = msg;
+  setTimeout(() => { $("statusMsg").textContent = ""; }, 4000);
+}
+function setSaveMsg(msg, type) {
+  const el = $("saveMsg");
+  if (!el) return;
+  if (SAVE_MSG_TIMER) { clearTimeout(SAVE_MSG_TIMER); SAVE_MSG_TIMER = null; }
+  el.textContent = msg || "";
+  el.classList.remove("ok","warn","show");
+  if (!msg) return;
+  if (type === "ok") el.classList.add("ok");
+  if (type === "warn") el.classList.add("warn");
+  el.classList.add("show");
+  SAVE_MSG_TIMER = setTimeout(() => { el.classList.remove("show"); SAVE_MSG_TIMER = null; }, 2500);
+}
+function setEditMode(on) {
+  EDIT_MODE = on;
+  $("editBadge").style.display = on ? "inline-block" : "none";
+  $("cancelEditBtn").style.display = on ? "inline-block" : "none";
+}
+function updateDescCounter() { $("descCount").textContent = $("descInput").value.length; }
+function renderSelectOptions(selectEl, opts, selected) {
+  selectEl.innerHTML = "";
+  for (const opt of opts) {
+    const o = document.createElement("option");
+    o.value = opt; o.textContent = opt;
+    if (opt === selected) o.selected = true;
+    selectEl.appendChild(o);
+  }
+}
+function getSelectedValues(selectEl) { return Array.from(selectEl.options).filter(o => o.selected).map(o => o.value); }
+function setSelectedValues(selectEl, vals) { for (const opt of selectEl.options) opt.selected = vals.includes(opt.value); }
+function renderFilterSelects() {
+  renderSelectOptions($("filterChild"), CFG.kids, "");
+  renderSelectOptions($("filterCat"), CFG.cats, "");
+  setSelectedValues($("filterChild"), []);
+  setSelectedValues($("filterCat"), []);
+}
+function renderMatiereSelect(selectedValue) {
+  const matieres = CFG.matieres || DEFAULT_MATIERES;
+  const sel = $("matiereSelect");
+  sel.innerHTML = "";
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "— Sélectionner —";
+  sel.appendChild(blank);
+  for (const opt of matieres) {
+    const o = document.createElement("option");
+    o.value = opt;
+    o.textContent = opt;
+    if (selectedValue && opt === selectedValue) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+function lockEntryForm(lock) {
+  document.querySelectorAll("#dateInput, #catSelect, #amtInput, #descInput, #noteInput, #moyenneInput, #matiereSelect, #saveDiskBtn")
+    .forEach(el => el.disabled = lock);
+  if (lock) setStatus("Sélectionne Lily ou Victor pour commencer 👆");
+}
+
+/* ========================= Rules modal ========================= */
+function openRulesModal() {
+  $("rulesModal").classList.add("open");
+}
+function closeRulesModal() {
+  $("rulesModal").classList.remove("open");
+}
+
+/* ========================= School fields + Dépense hint ========================= */
+function toggleSchoolFields() {
+  const cat = $("catSelect").value || "";
+  const isEcole = cat.toLowerCase().trim() === "école";
+  const isDebit = isDebitCat(cat);
+
+  // École fields
+  if (isEcole) {
+    $("schoolFields").classList.add("visible");
+    $("rulesInfoBtn").style.display = "inline-flex";
+  } else {
+    $("schoolFields").classList.remove("visible");
+    $("rulesInfoBtn").style.display = "none";
+    $("noteInput").value = "";
+    $("moyenneInput").value = "";
+    if ($("matiereSelect").options.length > 0) $("matiereSelect").selectedIndex = 0;
   }
 
-  // ── 2. Toast de mise à jour disponible ───────────────────────
-  function showUpdateToast() {
-    const el = document.createElement('div');
-    el.style.cssText = [
-      'position:fixed','bottom:80px','left:50%','transform:translateX(-50%)',
-      'background:#111','color:#fff','padding:10px 16px','border-radius:12px',
-      'font-size:13px','font-weight:700','z-index:9999','display:flex',
-      'gap:12px','align-items:center','box-shadow:0 4px 16px rgba(0,0,0,.25)',
-      'white-space:nowrap'
-    ].join(';');
-    el.innerHTML = '🔄 Mise à jour disponible';
+  // Dépense hint + styling
+  const amtHint = $("amtHint");
+  const amtInput = $("amtInput");
+  if (isDebit) {
+    amtHint.style.display = "block";
+    amtInput.classList.add("depense-mode");
+  } else {
+    amtHint.style.display = "none";
+    amtInput.classList.remove("depense-mode");
+  }
+}
 
-    const btnR = document.createElement('button');
-    btnR.textContent = 'Recharger';
-    btnR.style.cssText = 'background:#fff;color:#111;border:none;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer;font-size:12px;';
-    btnR.onclick = () => window.location.reload();
+/* ========================= Auto-calculate amount for École ========================= */
+function calculateSchoolAmount() {
+  if (($("catSelect").value || "").toLowerCase().trim() !== "école") return;
+  const note = parseFloat($("noteInput").value) || 0;
+  const moyenne = parseFloat($("moyenneInput").value) || 0;
+  if (note === 100) { $("amtInput").value = "20"; return; }
+  if (note >= 85) {
+    const diff = note - moyenne;
+    $("amtInput").value = diff > 0 ? String(Math.round(Math.min(diff, 10))) : "0";
+  } else if (note >= 80) {
+    const diff = note - moyenne;
+    $("amtInput").value = diff > 0 ? String(Math.round(Math.min(diff / 2, 10))) : "0";
+  } else {
+    $("amtInput").value = "0";
+  }
+}
 
-    const btnX = document.createElement('button');
-    btnX.textContent = '✕';
-    btnX.style.cssText = 'background:transparent;color:#aaa;border:none;font-size:16px;cursor:pointer;padding:0 2px;';
-    btnX.onclick = () => el.remove();
+/* ========================= Active child ========================= */
+function setActiveChild(childName) {
+  ACTIVE_CHILD = childName;
+  const entryCard = $("entryCard");
+  $("kidLily").classList.remove("active");
+  $("kidVictor").classList.remove("active");
+  if (entryCard) entryCard.classList.remove("saisie-lily", "saisie-victor");
+  if (!childName) { lockEntryForm(true); return; }
+  lockEntryForm(false);
+  if (childName === "Lily-Rose") { $("kidLily").classList.add("active"); if (entryCard) entryCard.classList.add("saisie-lily"); }
+  else { $("kidVictor").classList.add("active"); if (entryCard) entryCard.classList.add("saisie-victor"); }
+  CFG.defaults.kid = childName;
+  saveConfig(CFG);
+  resetEntryForm();
+}
 
-    el.appendChild(btnR);
-    el.appendChild(btnX);
-    document.body.appendChild(el);
+function resetEntryForm() {
+  $("dateInput").value = todayISO();
+  $("catSelect").value = CFG.defaults.cat || CFG.cats[0];
+  $("amtInput").value = "";
+  $("descInput").value = "";
+  $("noteInput").value = "";
+  $("moyenneInput").value = "";
+  if ($("matiereSelect").options.length > 0) $("matiereSelect").selectedIndex = 0;
+  updateDescCounter();
+  toggleSchoolFields();
+}
+
+/* ========================= Save / Update ========================= */
+async function saveOrUpdate() {
+  if (!ACTIVE_CHILD) {
+    setSaveMsg("Sélectionne Lily-Rose ou Victor avant d'enregistrer.", "warn");
+    return setStatus("Tu dois sélectionner un enfant avant d'enregistrer.");
   }
 
-  // ── 3. Bannière d'installation ────────────────────────────────
-  let deferredPrompt = null;
+  const dateVal = $("dateInput").value;
+  const cat = $("catSelect").value;
+  let amt = parseInt($("amtInput").value, 10);
+  const desc = $("descInput").value.trim();
+  const isEcole = (cat || "").toLowerCase().trim() === "école";
 
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
+  let note = null, moyenne = null, matiere = null;
+  if (isEcole) {
+    note = parseFloat($("noteInput").value);
+    moyenne = parseFloat($("moyenneInput").value);
+    matiere = $("matiereSelect").value;
+    if (!Number.isFinite(note) || !Number.isFinite(moyenne)) {
+      setSaveMsg("Veuillez compléter les infos manquantes avant d'enregistrer", "warn");
+      return setStatus("Pour École, la note et la moyenne sont obligatoires.");
+    }
+    if (!matiere) {
+      setSaveMsg("Veuillez sélectionner une matière avant d'enregistrer", "warn");
+      return setStatus("Pour École, la matière est obligatoire.");
+    }
+  }
 
-    const btn = document.createElement('button');
-    btn.id = 'btnInstall';
-    btn.textContent = '📲 Installer';
-    btn.style.cssText = 'border-color:#3a8af9;color:#3a8af9;';
+  if (!dateVal || !cat || !Number.isFinite(amt) || !desc) {
+    setSaveMsg("Veuillez compléter les infos manquantes avant d'enregistrer", "warn");
+    return setStatus("Tous les champs sont obligatoires.");
+  }
 
-    btn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      if (outcome === 'accepted') btn.remove();
+  // Auto-négatif pour les catégories débit (ex: Dépense)
+  if (isDebitCat(cat) && amt > 0) {
+    amt = -amt;
+  }
+
+  if (isEcole) {
+    const baseDate = new Date(dateVal + "T00:00:00");
+    const ONE_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
+    const allTx = await dbGetAll(STORE_TX);
+    const dup = allTx
+      .filter(r => r && r.child === ACTIVE_CHILD)
+      .filter(r => (r.category || "").toLowerCase().trim() === "école")
+      .filter(r => !(EDIT_MODE && EDIT_ID !== null && r.id === EDIT_ID))
+      .find(r =>
+        Number.isFinite(r.note) && Number.isFinite(r.moyenne) &&
+        Math.abs(r.note - note) < 1e-9 &&
+        Math.abs(r.moyenne - moyenne) < 1e-9 &&
+        (r.matiere || "") === matiere &&
+        Math.abs(new Date(r.date + "T00:00:00") - baseDate) <= ONE_MONTH_MS
+      );
+    if (dup) {
+      const msg =
+        `Doublon potentiel détecté !\n\n` +
+        `Pour ${ACTIVE_CHILD}, une entrée École identique existe déjà :\n` +
+        `• Matière : ${dup.matiere || "(non définie)"}\n` +
+        `• Note : ${dup.note}  —  Moyenne : ${dup.moyenne}\n` +
+        `• Date existante : ${dup.date}\n` +
+        `• Description existante : "${(dup.desc || "").slice(0, 100)}"\n\n` +
+        `Nouvelle description : "${desc.slice(0, 100)}"\n\n` +
+        `Voulez-vous tout de même continuer ?`;
+      if (!window.confirm(msg)) {
+        setSaveMsg("", "");
+        return setStatus("Enregistrement annulé.");
+      }
+    }
+  }
+
+  const record = {
+    child: ACTIVE_CHILD,
+    date: dateVal,
+    category: cat,
+    amount: amt,
+    desc: desc.slice(0, 100),
+    note: isEcole ? note : null,
+    moyenne: isEcole ? moyenne : null,
+    matiere: isEcole ? matiere : null,
+    createdAt: Date.now(),
+    updatedAt: null
+  };
+
+  if (EDIT_MODE && EDIT_ID !== null) {
+    record.id = EDIT_ID;
+    const existing = await dbGet(STORE_TX, EDIT_ID);
+    if (existing) record.createdAt = existing.createdAt;
+    record.updatedAt = Date.now();
+    await dbPut(STORE_TX, record);
+    await logAction("UPDATE", amt, `Modif: ${ACTIVE_CHILD} | ${cat}${matiere ? " | " + matiere : ""} | ${desc}`);
+    setSaveMsg("Enregistrement ok", "ok");
+    setStatus("Enregistrement ok");
+    setEditMode(false);
+    EDIT_ID = null;
+  } else {
+    await dbAdd(STORE_TX, record);
+    await logAction("ADD", amt, `Ajout: ${ACTIVE_CHILD} | ${cat}${matiere ? " | " + matiere : ""} | ${desc}`);
+    setSaveMsg("Enregistrement ok", "ok");
+    setStatus("Enregistrement ok");
+  }
+
+  await refreshData();
+  resetEntryForm();
+}
+
+function cancelEdit() {
+  setEditMode(false);
+  EDIT_ID = null;
+  resetEntryForm();
+  setStatus("Modification annulée.");
+}
+
+/* ========================= Load / Delete / Edit ========================= */
+async function refreshData() {
+  ALL_DATA = (await dbGetAll(STORE_TX)).map(r => ({...r, amount: Math.round(Number(r.amount || 0))}));
+  renderTable();
+  await renderTotals();
+  await renderLog();
+  await updateDbInfo();
+}
+async function updateDbInfo() {
+  const logCount = (await dbGetAll(STORE_LOG)).length;
+  $("dbInfo").textContent = `${ALL_DATA.length} transactions • ${logCount} log`;
+}
+async function deleteRecord(id) {
+  if (!confirm("Supprimer cette transaction ?")) return;
+  const rec = await dbGet(STORE_TX, id);
+  if (!rec) return;
+  await dbDelete(STORE_TX, id);
+  await logAction("DELETE", rec.amount, `Suppression: ${rec.child} | ${rec.category}${rec.matiere ? " | " + rec.matiere : ""} | ${rec.desc}`);
+  await refreshData();
+  setStatus("Transaction supprimée ✅");
+}
+async function editRecord(id) {
+  const rec = await dbGet(STORE_TX, id);
+  if (!rec) return;
+  EDIT_ID = id;
+  setEditMode(true);
+  setActiveChild(FIXED_KIDS.includes(rec.child) ? rec.child : FIXED_KIDS[0]);
+  $("dateInput").value = rec.date;
+  $("catSelect").value = rec.category;
+  $("amtInput").value = rec.amount;
+  $("descInput").value = rec.desc;
+  $("noteInput").value = (rec.note ?? "");
+  $("moyenneInput").value = (rec.moyenne ?? "");
+  toggleSchoolFields();
+  if (rec.matiere) {
+    $("matiereSelect").value = rec.matiere;
+    if ($("matiereSelect").value !== rec.matiere) {
+      const opt = document.createElement("option");
+      opt.value = rec.matiere;
+      opt.textContent = rec.matiere + " (valeur existante)";
+      $("matiereSelect").appendChild(opt);
+      $("matiereSelect").value = rec.matiere;
+    }
+  }
+  updateDescCounter();
+  setStatus("Mode modification activé.");
+}
+
+/* ========================= Render ========================= */
+function applyFilters(data) {
+  let arr = data.slice();
+  if (FILTER.children.length > 0) arr = arr.filter(r => FILTER.children.includes(r.child));
+  if (FILTER.cats.length > 0) arr = arr.filter(r => FILTER.cats.includes(r.category));
+  if (FILTER.desc) { const s = FILTER.desc.toLowerCase(); arr = arr.filter(r => r.desc.toLowerCase().includes(s)); }
+  if (FILTER.from) arr = arr.filter(r => r.date >= FILTER.from);
+  if (FILTER.to) arr = arr.filter(r => r.date <= FILTER.to);
+  return arr;
+}
+function sortData(data) {
+  const col = SORT.col, dir = SORT.dir;
+  data.sort((a, b) => {
+    let va = a[col] || "", vb = b[col] || "";
+    if (col === "date") { va = new Date(va).getTime(); vb = new Date(vb).getTime(); }
+    if (col === "amount") { va = parseFloat(va); vb = parseFloat(vb); }
+    if (va < vb) return dir === "asc" ? -1 : 1;
+    if (va > vb) return dir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+function renderTable() {
+  const filtered = applyFilters(ALL_DATA);
+  sortData(filtered);
+  const tbody = $("txBody");
+  tbody.innerHTML = "";
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#6b7280;">Aucune transaction</td></tr>`;
+  } else {
+    for (const row of filtered) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="pill">${row.child}</span></td>
+        <td>${formatDateHuman(row.date)}</td>
+        <td>${row.category}</td>
+        <td style="font-size:13px;">${row.matiere || ""}</td>
+        <td class="right"><span class="amt ${row.amount >= 0 ? "pos" : "neg"}">${row.amount} $</span></td>
+        <td>${row.desc}</td>
+        <td>
+          <button class="smallBtn secondary" onclick="editRecord(${row.id})" type="button">Modifier</button>
+          <button class="smallBtn danger" onclick="deleteRecord(${row.id})" type="button">Supprimer</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  const filteredSum = filtered.reduce((s, r) => s + r.amount, 0);
+  $("rowsCount").textContent = `${filtered.length} transaction(s)`;
+  $("filteredTotal").textContent = `${filteredSum} $`;
+}
+async function renderTotals() {
+  const totals = {};
+  for (const kid of CFG.kids) totals[kid] = 0;
+  for (const r of ALL_DATA) {
+    if (!r || !totals.hasOwnProperty(r.child)) continue;
+    totals[r.child] += Number.isFinite(r.amount) ? r.amount : 0;
+  }
+  if ($("kidLily")) $("kidLily").textContent = `Lily-Rose (${totals["Lily-Rose"] ?? 0}$)`;
+  if ($("kidVictor")) $("kidVictor").textContent = `Victor (${totals["Victor"] ?? 0}$)`;
+}
+async function renderLog() {
+  const logs = await dbGetAll(STORE_LOG);
+  const tbody = $("logBody");
+  tbody.innerHTML = "";
+  if (logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#6b7280;">Aucune entrée</td></tr>`;
+  } else {
+    for (const entry of logs.slice().sort((a,b) => b.ts - a.ts)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="font-size:12px;">${formatTS(entry.ts)}</td>
+        <td><span class="pill">${entry.action}</span></td>
+        <td class="right"><span class="amt ${entry.amount >= 0 ? "pos" : "neg"}">${entry.amount} $</span></td>
+        <td style="font-size:12px;">${entry.details}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+}
+
+/* ========================= Settings ========================= */
+async function loadSettingsUI() {
+  $("catsCfg").value = CFG.cats.join("\n");
+  $("matieresCfg").value = (CFG.matieres || DEFAULT_MATIERES).join("\n");
+  $("backupDays").value = CFG.backup?.intervalDays || 7;
+  $("lastBackupDisplay").value = CFG.backup?.lastBackupTs ? formatTS(CFG.backup.lastBackupTs) : "Jamais";
+}
+async function saveSettingsFromUI() {
+  const lines = $("catsCfg").value.trim().split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return setStatus("Au moins une catégorie.");
+  CFG.cats = lines;
+  if (!CFG.cats.includes(CFG.defaults.cat)) CFG.defaults.cat = CFG.cats[0];
+  await saveConfig(CFG);
+  await initUIAfterConfig();
+  setStatus("Catégories enregistrées ✅");
+}
+async function resetSettingsToDefault() {
+  if (!confirm("Remettre les catégories par défaut ?")) return;
+  CFG.cats = DEFAULT_CATS.slice();
+  CFG.defaults.cat = DEFAULT_CATS[0];
+  await saveConfig(CFG);
+  await initUIAfterConfig();
+  setStatus("Catégories par défaut restaurées ✅");
+}
+async function saveMatieresFromUI() {
+  const lines = $("matieresCfg").value.trim().split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return setStatus("Au moins une matière.");
+  CFG.matieres = lines;
+  await saveConfig(CFG);
+  renderMatiereSelect();
+  setStatus("Matières enregistrées ✅");
+}
+async function resetMatieresToDefault() {
+  if (!confirm("Remettre les matières par défaut ?")) return;
+  CFG.matieres = DEFAULT_MATIERES.slice();
+  await saveConfig(CFG);
+  $("matieresCfg").value = CFG.matieres.join("\n");
+  renderMatiereSelect();
+  setStatus("Matières par défaut restaurées ✅");
+}
+
+/* ========================= Backup ========================= */
+async function updateBackupUI() {
+  $("lastBackupDisplay").value = CFG.backup?.lastBackupTs ? formatTS(CFG.backup.lastBackupTs) : "Jamais";
+}
+async function saveBackupReminderFromUI() {
+  const days = parseInt($("backupDays").value, 10);
+  if (!Number.isFinite(days) || days < 1) return setStatus("Intervalle invalide.");
+  CFG.backup.intervalDays = days;
+  await saveConfig(CFG);
+  setStatus("Rappel backup enregistré ✅");
+}
+function maybeRemindBackup() {
+  const last = CFG.backup?.lastBackupTs;
+  const interval = CFG.backup?.intervalDays || 7;
+  if (!last) { $("backupInfo").textContent = "⚠️ Aucun backup fait. Pense à en faire un régulièrement !"; return; }
+  const elapsedDays = (Date.now() - last) / (1000 * 60 * 60 * 24);
+  $("backupInfo").textContent = elapsedDays >= interval
+    ? `⚠️ Dernier backup il y a ${Math.floor(elapsedDays)} jours. Temps de refaire un backup !`
+    : `✅ Backup OK (il y a ${Math.floor(elapsedDays)} jours).`;
+}
+async function backupNow() {
+  await exportJSON();
+  await exportCSV();
+  CFG.backup.lastBackupTs = Date.now();
+  await saveConfig(CFG);
+  await updateBackupUI();
+  maybeRemindBackup();
+  setStatus("Backup terminé (JSON + CSV) ✅");
+}
+
+/* ========================= Export CSV ========================= */
+async function exportCSV() {
+  const rows = await dbGetAll(STORE_TX);
+  let csv = "Enfant,Date,Catégorie,Matière,Montant,Description,Créé le,Modifié le\n";
+  for (const r of rows) {
+    const esc = (s) => (s || "").replace(/"/g, '""');
+    csv += `"${esc(r.child)}","${r.date || ""}","${esc(r.category)}","${esc(r.matiere)}","${r.amount || 0}","${esc(r.desc)}","${formatTS(r.createdAt)}","${r.updatedAt ? formatTS(r.updatedAt) : ""}"\n`;
+  }
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `budget-enfants-${todayISO()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  await logAction("EXPORT_CSV", 0, "Export CSV des transactions");
+}
+
+/* ========================= Import / Export JSON ========================= */
+async function exportJSON() {
+  const payload = { version: 1, exportedAt: nowISO(), cfg: CFG, tx: await dbGetAll(STORE_TX), log: await dbGetAll(STORE_LOG) };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `budget-enfants-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  await logAction("EXPORT", 0, "Export JSON complet (transactions + journal)");
+  await refreshData();
+  setStatus("Export prêt ✅");
+}
+async function exportLogOnly() {
+  const payload = { exportedAt: nowISO(), log: await dbGetAll(STORE_LOG) };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `journal-budget-${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  setStatus("Export journal prêt ✅");
+}
+async function importJSON(file) {
+  const text = await file.text();
+  let payload;
+  try { payload = JSON.parse(text); } catch { return setStatus("Fichier JSON invalide."); }
+  if (!payload || !Array.isArray(payload.tx) || !payload.cfg) return setStatus("JSON non reconnu.");
+
+  CFG = payload.cfg;
+  CFG.kids = FIXED_KIDS;
+  CFG.cats = Array.isArray(CFG.cats) && CFG.cats.length ? CFG.cats : DEFAULT_CATS;
+  CFG.matieres = Array.isArray(CFG.matieres) && CFG.matieres.length ? CFG.matieres : DEFAULT_MATIERES;
+  CFG.defaults = CFG.defaults || { kid: null, cat: CFG.cats[0] };
+  CFG.defaults.kid = null;
+  if (!CFG.cats.includes(CFG.defaults.cat)) CFG.defaults.cat = CFG.cats[0];
+  CFG.backup = CFG.backup || { intervalDays: 7, lastBackupTs: null };
+  if (!Number.isFinite(Number(CFG.backup.intervalDays)) || Number(CFG.backup.intervalDays) < 1) CFG.backup.intervalDays = 7;
+  if (CFG.backup.lastBackupTs !== null && !Number.isFinite(Number(CFG.backup.lastBackupTs))) CFG.backup.lastBackupTs = null;
+
+  await saveConfig(CFG);
+  await dbClear(STORE_TX);
+  await dbClear(STORE_LOG);
+
+  for (const r of payload.tx) {
+    const safe = {
+      child: FIXED_KIDS.includes(String(r.child)) ? String(r.child) : FIXED_KIDS[0],
+      date: String(r.date || ""),
+      category: String(r.category || ""),
+      amount: Math.round(Number(r.amount || 0)),
+      desc: String(r.desc || "").slice(0, 100),
+      note: (r.note !== undefined && r.note !== null) ? Number(r.note) : null,
+      moyenne: (r.moyenne !== undefined && r.moyenne !== null) ? Number(r.moyenne) : null,
+      matiere: r.matiere ? String(r.matiere) : null,
+      createdAt: Number(r.createdAt || Date.now()),
+      updatedAt: r.updatedAt ? Number(r.updatedAt) : null
+    };
+    if (!safe.date || !safe.category || !Number.isFinite(safe.amount) || !safe.desc) continue;
+    await dbAdd(STORE_TX, safe);
+  }
+  if (Array.isArray(payload.log)) {
+    for (const l of payload.log) {
+      await dbAdd(STORE_LOG, { ts: Number(l.ts || Date.now()), action: String(l.action || "IMPORT"), amount: Math.round(Number(l.amount || 0)), details: String(l.details || "") });
+    }
+  }
+  await logAction("IMPORT", 0, "Import JSON complet (transactions + journal)");
+  await initUIAfterConfig();
+  setStatus("Import terminé ✅");
+}
+async function clearLog() {
+  if (!confirm("Vider le journal des actions ?")) return;
+  await dbClear(STORE_LOG);
+  await refreshData();
+  setStatus("Journal vidé ✅");
+}
+
+/* ========================= Init ========================= */
+async function initUIAfterConfig() {
+  $("dateInput").value = todayISO();
+  renderSelectOptions($("catSelect"), CFG.cats, CFG.defaults.cat || CFG.cats[0]);
+  renderMatiereSelect();
+  FILTER = { children: [], cats: [], desc: "", from: "", to: "" };
+  renderFilterSelects();
+  $("fromDate").value = ""; $("toDate").value = ""; $("filterDesc").value = "";
+  await loadSettingsUI();
+  await refreshData();
+  setEditMode(false);
+  updateDescCounter();
+  await updateBackupUI();
+  maybeRemindBackup();
+  setActiveChild(null);
+  resetEntryForm();
+  lockEntryForm(true);
+  toggleSchoolFields();
+}
+
+/* ========================= PWA Install Prompt ========================= */
+let _deferredInstall = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  _deferredInstall = e;
+  const banner = document.getElementById("installBanner");
+  if (banner) banner.classList.add("show");
+});
+window.addEventListener("appinstalled", () => {
+  _deferredInstall = null;
+  const banner = document.getElementById("installBanner");
+  if (banner) banner.classList.remove("show");
+});
+
+async function init() {
+  // PWA install banner actions
+  const installBtn = document.getElementById("installBtn");
+  const dismissBtn = document.getElementById("installDismissBtn");
+  const banner = document.getElementById("installBanner");
+  if (installBtn) installBtn.addEventListener("click", async () => {
+    if (!_deferredInstall) return;
+    _deferredInstall.prompt();
+    const { outcome } = await _deferredInstall.userChoice;
+    _deferredInstall = null;
+    if (banner) banner.classList.remove("show");
+  });
+  if (dismissBtn) dismissBtn.addEventListener("click", () => {
+    if (banner) banner.classList.remove("show");
+  });
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+  db = await openDB();
+  CFG = await loadConfig();
+  CFG.kids = FIXED_KIDS;
+  CFG.cats = Array.isArray(CFG.cats) && CFG.cats.length ? CFG.cats : DEFAULT_CATS;
+  CFG.matieres = Array.isArray(CFG.matieres) && CFG.matieres.length ? CFG.matieres : DEFAULT_MATIERES;
+  CFG.defaults = CFG.defaults || { kid: null, cat: CFG.cats?.[0] || DEFAULT_CATS[0] };
+  CFG.defaults.kid = null;
+  CFG.backup = CFG.backup || { intervalDays: 7, lastBackupTs: null };
+  if (!Number.isFinite(Number(CFG.backup.intervalDays)) || Number(CFG.backup.intervalDays) < 1) CFG.backup.intervalDays = 7;
+  if (CFG.backup.lastBackupTs !== null && !Number.isFinite(Number(CFG.backup.lastBackupTs))) CFG.backup.lastBackupTs = null;
+
+  await initUIAfterConfig();
+
+  // Support raccourcis PWA (?kid=lily ou ?kid=victor)
+  const urlParams = new URLSearchParams(window.location.search);
+  const kidParam = (urlParams.get("kid") || "").toLowerCase();
+  if (kidParam === "lily") setActiveChild("Lily-Rose");
+  else if (kidParam === "victor") setActiveChild("Victor");
+
+  $("saveDiskBtn").addEventListener("click", saveOrUpdate);
+  $("cancelEditBtn").addEventListener("click", cancelEdit);
+  $("descInput").addEventListener("input", updateDescCounter);
+  $("catSelect").addEventListener("change", toggleSchoolFields);
+  $("noteInput").addEventListener("input", calculateSchoolAmount);
+  $("moyenneInput").addEventListener("input", calculateSchoolAmount);
+  $("backupNowBtn2").addEventListener("click", backupNow);
+  $("saveBackupCfgBtn").addEventListener("click", saveBackupReminderFromUI);
+  $("kidLily").addEventListener("click", () => setActiveChild("Lily-Rose"));
+  $("kidVictor").addEventListener("click", () => setActiveChild("Victor"));
+
+  // Rules modal
+  $("rulesInfoBtn").addEventListener("click", openRulesModal);
+  $("rulesModalClose").addEventListener("click", closeRulesModal);
+  $("rulesModal").addEventListener("click", (e) => { if (e.target === $("rulesModal")) closeRulesModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRulesModal(); });
+
+  if ($("toggleFiltersBtn")) $("toggleFiltersBtn").addEventListener("click", () => $("filtersWrap").classList.toggle("show"));
+  $("applyFilterBtn").addEventListener("click", () => {
+    FILTER.children = getSelectedValues($("filterChild"));
+    FILTER.cats = getSelectedValues($("filterCat"));
+    FILTER.desc = $("filterDesc").value || "";
+    FILTER.from = $("fromDate").value || "";
+    FILTER.to = $("toDate").value || "";
+    renderTable();
+  });
+  $("clearFilterBtn").addEventListener("click", () => {
+    FILTER = { children: [], cats: [], desc: "", from: "", to: "" };
+    setSelectedValues($("filterChild"), []); setSelectedValues($("filterCat"), []);
+    $("filterDesc").value = ""; $("fromDate").value = ""; $("toDate").value = "";
+    renderTable();
+  });
+  $("exportBtn").addEventListener("click", backupNow);
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async (e) => { const f = e.target.files?.[0]; if (!f) return; await importJSON(f); e.target.value = ""; });
+  $("clearLogBtn").addEventListener("click", clearLog);
+  $("exportLogBtn").addEventListener("click", exportLogOnly);
+  $("saveCfgBtn").addEventListener("click", saveSettingsFromUI);
+  $("resetCfgBtn").addEventListener("click", resetSettingsToDefault);
+  $("saveMatieresCfgBtn").addEventListener("click", saveMatieresFromUI);
+  $("resetMatieresCfgBtn").addEventListener("click", resetMatieresToDefault);
+  document.querySelectorAll('button[data-sort]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const col = btn.getAttribute("data-sort");
+      if (SORT.col === col) SORT.dir = (SORT.dir === "asc") ? "desc" : "asc";
+      else { SORT.col = col; SORT.dir = col === "date" ? "desc" : "asc"; }
+      renderTable();
     });
-
-    const toolbar = document.querySelector('.toolbar');
-    if (toolbar) toolbar.appendChild(btn);
   });
+  $("amtInput").addEventListener("keydown", (e) => { if (e.key === "Enter") saveOrUpdate(); });
+  $("descInput").addEventListener("keydown", (e) => { if (e.key === "Enter") saveOrUpdate(); });
+}
 
-  window.addEventListener('appinstalled', () => {
-    const btn = document.querySelector('#btnInstall');
-    if (btn) btn.remove();
-    deferredPrompt = null;
-  });
-})();
+init();
 </script>
 </body>
 </html>
