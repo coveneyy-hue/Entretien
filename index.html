@@ -270,22 +270,15 @@
 
 <dialog id="dlgHistory">
   <div class="modal-head">
-    <strong>Journal (Historique)</strong>
-    <button id="btnCloseHist" aria-label="Fermer">✕</button>
+    <strong>Journal</strong>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="btnHistFilter" title="Filtrer" style="position:relative;">🔍 Filtrer <span id="filterBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#111;color:#fff;border-radius:999px;font-size:10px;padding:1px 5px;"></span></button>
+      <button id="btnCloseHist" aria-label="Fermer">✕</button>
+    </div>
   </div>
   <div class="modal-body">
-    <div class="tabs">
-      <button id="tabGlobal" class="primary">Regroupé global</button>
-      <button id="tabByItem">Par item</button>
-    </div>
-
-    <div id="viewGlobal" style="margin-top:12px; display:grid; gap:10px;"></div>
-
-    <div id="viewByItem" class="hidden" style="margin-top:12px;">
-      <select id="histItemSelect"></select>
-      <div id="histItemEvents" style="margin-top:10px; display:grid; gap:10px;"></div>
-    </div>
-
+    <div id="activeFilterSummary" class="hidden" style="font-size:12px;color:#555;margin-bottom:8px;padding:6px 10px;background:#f3f4f7;border-radius:8px;"></div>
+    <div id="viewGlobal" style="display:grid; gap:10px;"></div>
     <div class="small" style="margin-top:12px;">
       Astuce : Export/Import JSON te permet de sauvegarder ou restaurer tes données.
     </div>
@@ -293,6 +286,42 @@
   <div class="modal-foot">
     <button id="btnClearHist" class="danger">Vider le journal</button>
     <button id="btnCloseHist2" class="primary">OK</button>
+  </div>
+</dialog>
+
+<dialog id="dlgHistFilter">
+  <div class="modal-head">
+    <strong>🔍 Filtrer le journal</strong>
+    <button id="btnCloseHistFilter" aria-label="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <label>Tâche
+      <select id="fFilterItem">
+        <option value="">— Toutes les tâches —</option>
+      </select>
+    </label>
+    <label>Date de début
+      <input type="date" id="fFilterDateFrom" />
+    </label>
+    <label>Date de fin
+      <input type="date" id="fFilterDateTo" />
+    </label>
+    <label style="margin-top:14px;font-size:12px;color:#333;font-weight:900;display:block;">Types d'événements</label>
+    <div style="display:grid;gap:8px;margin-top:6px;">
+      <label style="display:flex;align-items:center;gap:8px;margin:0;font-weight:700;font-size:13px;">
+        <input type="checkbox" id="fFilterDone" checked style="width:18px;height:18px;" /> ✅ Fait
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin:0;font-weight:700;font-size:13px;">
+        <input type="checkbox" id="fFilterAlert" checked style="width:18px;height:18px;" /> 🚨 Exécuté avec retard
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin:0;font-weight:700;font-size:13px;">
+        <input type="checkbox" id="fFilterPostpone" checked style="width:18px;height:18px;" /> ⏩ Reporté
+      </label>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button id="btnResetFilter">Réinitialiser</button>
+    <button id="btnApplyFilter" class="primary">Appliquer</button>
   </div>
 </dialog>
 
@@ -543,9 +572,6 @@
 
   const dlgHistory = document.querySelector("#dlgHistory");
   const viewGlobal = document.querySelector("#viewGlobal");
-  const viewByItem = document.querySelector("#viewByItem");
-  const histItemSelect = document.querySelector("#histItemSelect");
-  const histItemEvents = document.querySelector("#histItemEvents");
 
   let selectedRowIndex = -1;
   let currentRows = [];
@@ -961,22 +987,100 @@
   document.querySelector("#btnCloseHist").addEventListener("click", () => dlgHistory.close());
   document.querySelector("#btnCloseHist2").addEventListener("click", () => dlgHistory.close());
 
-  document.querySelector("#tabGlobal").addEventListener("click", () => setHistTab("global"));
-  document.querySelector("#tabByItem").addEventListener("click", () => setHistTab("item"));
+  // ── Filter state ──────────────────────────────────────────
+  let histFilters = { itemId: "", dateFrom: "", dateTo: "", done: true, alert: true, postpone: true };
 
-  function setHistTab(which) {
-    const isGlobal = which === "global";
-    viewGlobal.classList.toggle("hidden", !isGlobal);
-    viewByItem.classList.toggle("hidden", isGlobal);
-    document.querySelector("#tabGlobal").classList.toggle("primary", isGlobal);
-    document.querySelector("#tabByItem").classList.toggle("primary", !isGlobal);
-  }
+  const dlgHistFilter = document.querySelector("#dlgHistFilter");
+  const fFilterItem     = document.querySelector("#fFilterItem");
+  const fFilterDateFrom = document.querySelector("#fFilterDateFrom");
+  const fFilterDateTo   = document.querySelector("#fFilterDateTo");
+  const fFilterDone     = document.querySelector("#fFilterDone");
+  const fFilterAlert    = document.querySelector("#fFilterAlert");
+  const fFilterPostpone = document.querySelector("#fFilterPostpone");
+  const filterBadge     = document.querySelector("#filterBadge");
+  const activeFilterSummary = document.querySelector("#activeFilterSummary");
+
+  document.querySelector("#btnHistFilter").addEventListener("click", async () => {
+    // Populate item select
+    const items = await getAll("items");
+    fFilterItem.innerHTML = `<option value="">— Toutes les tâches —</option>`;
+    items.sort((a,b)=>a.description.localeCompare(b.description,"fr")).forEach(it => {
+      const opt = document.createElement("option");
+      opt.value = String(it.id);
+      opt.textContent = it.description;
+      if (String(it.id) === histFilters.itemId) opt.selected = true;
+      fFilterItem.appendChild(opt);
+    });
+    // Restore current filter values
+    fFilterDateFrom.value = histFilters.dateFrom;
+    fFilterDateTo.value   = histFilters.dateTo;
+    fFilterDone.checked     = histFilters.done;
+    fFilterAlert.checked    = histFilters.alert;
+    fFilterPostpone.checked = histFilters.postpone;
+    dlgHistFilter.showModal();
+  });
+
+  document.querySelector("#btnCloseHistFilter").addEventListener("click", () => dlgHistFilter.close());
+
+  document.querySelector("#btnResetFilter").addEventListener("click", () => {
+    histFilters = { itemId: "", dateFrom: "", dateTo: "", done: true, alert: true, postpone: true };
+    dlgHistFilter.close();
+    renderHistoryGlobal();
+  });
+
+  document.querySelector("#btnApplyFilter").addEventListener("click", () => {
+    histFilters = {
+      itemId:   fFilterItem.value,
+      dateFrom: fFilterDateFrom.value,
+      dateTo:   fFilterDateTo.value,
+      done:     fFilterDone.checked,
+      alert:    fFilterAlert.checked,
+      postpone: fFilterPostpone.checked,
+    };
+    dlgHistFilter.close();
+    renderHistoryGlobal();
+  });
 
   async function openHistory() {
     await renderHistoryGlobal();
-    await renderHistoryItemPicker();
-    setHistTab("global");
     dlgHistory.showModal();
+  }
+
+  function applyFilters(events, byId) {
+    let filtered = events;
+    if (histFilters.itemId) filtered = filtered.filter(e => String(e.itemId) === histFilters.itemId);
+    if (histFilters.dateFrom) {
+      const from = new Date(histFilters.dateFrom).getTime();
+      filtered = filtered.filter(e => e.ts >= from);
+    }
+    if (histFilters.dateTo) {
+      const to = new Date(histFilters.dateTo + "T23:59:59").getTime();
+      filtered = filtered.filter(e => e.ts <= to);
+    }
+    if (!histFilters.done)     filtered = filtered.filter(e => e.type !== "done");
+    if (!histFilters.alert)    filtered = filtered.filter(e => e.type !== "alert");
+    if (!histFilters.postpone) filtered = filtered.filter(e => e.type !== "postpone");
+    return filtered;
+  }
+
+  function updateFilterBadge(count) {
+    const active = histFilters.itemId || histFilters.dateFrom || histFilters.dateTo
+      || !histFilters.done || !histFilters.alert || !histFilters.postpone;
+    filterBadge.textContent = active ? "●" : "";
+    filterBadge.classList.toggle("hidden", !active);
+
+    if (active) {
+      const parts = [];
+      if (histFilters.itemId) parts.push(`Tâche filtrée`);
+      if (histFilters.dateFrom) parts.push(`Depuis ${histFilters.dateFrom}`);
+      if (histFilters.dateTo)   parts.push(`Jusqu'au ${histFilters.dateTo}`);
+      const types = [histFilters.done && "Fait", histFilters.alert && "Retard", histFilters.postpone && "Report"].filter(Boolean);
+      if (types.length < 3) parts.push(`Types: ${types.join(", ")}`);
+      activeFilterSummary.textContent = `Filtres actifs — ${parts.join(" • ")} • ${count} résultat(s)`;
+      activeFilterSummary.classList.remove("hidden");
+    } else {
+      activeFilterSummary.classList.add("hidden");
+    }
   }
 
   async function renderHistoryGlobal() {
@@ -998,8 +1102,11 @@
     postpones.forEach(p => events.push({ type:"postpone", ts:p.datePostpone, itemId:p.itemId, extra:{ days:p.days, previousDueDateYMD:p.previousDueDateYMD, newDueDateYMD:p.newDueDateYMD } }));
     events.sort((a,b)=>b.ts - a.ts);
 
-    viewGlobal.innerHTML = events.length ? "" : `<div class="hist-item">Aucun journal.</div>`;
-    for (const ev of events.slice(0, 300)) {
+    const filtered = applyFilters(events, byId);
+    updateFilterBadge(filtered.length);
+
+    viewGlobal.innerHTML = filtered.length ? "" : `<div class="hist-item">Aucun résultat.</div>`;
+    for (const ev of filtered.slice(0, 300)) {
       const desc = byId[ev.itemId] ?? `#${ev.itemId}`;
       const box = document.createElement("div");
       box.className = "hist-item";
@@ -1028,84 +1135,6 @@
         box.appendChild(actions);
       }
       viewGlobal.appendChild(box);
-    }
-  }
-
-  async function renderHistoryItemPicker() {
-    const items = await getAll("items");
-    histItemSelect.innerHTML = "";
-    items.sort((a,b)=>a.description.localeCompare(b.description,"fr")).forEach(it => {
-      const opt = document.createElement("option");
-      opt.value = String(it.id);
-      opt.textContent = it.description;
-      histItemSelect.appendChild(opt);
-    });
-    histItemSelect.onchange = renderHistoryForSelectedItem;
-    await renderHistoryForSelectedItem();
-  }
-
-  async function renderHistoryForSelectedItem() {
-    const itemId = Number(histItemSelect.value);
-    if (!itemId) { histItemEvents.innerHTML = ""; return; }
-
-    const item = (await getAll("items")).find(x => x.id === itemId);
-    const checks = await getAll("checks", "by_item", itemId);
-    const alerts = await getAll("alerts", "by_item", itemId);
-    const postpones = await getAll("postpones", "by_item", itemId);
-
-    const events = [];
-    checks.forEach(c => events.push({ type:"done", ts:c.dateCheck }));
-    alerts.forEach(a => {
-      const dueDate = fromYMD(a.dueDateYMD);
-      const alertDay = new Date(a.dateAlert); alertDay.setHours(0,0,0,0);
-      const daysDue = Math.max(0, daysBetween(dueDate, alertDay));
-      events.push({ type:"alert", ts:a.dateAlert, extra:{ dueDateYMD:a.dueDateYMD, daysDue } });
-    });
-    postpones.forEach(p => events.push({ type:"postpone", ts:p.datePostpone, extra:{ days:p.days, previousDueDateYMD:p.previousDueDateYMD, newDueDateYMD:p.newDueDateYMD } }));
-    events.sort((a,b)=>b.ts - a.ts);
-
-    histItemEvents.innerHTML = "";
-    const title = document.createElement("div");
-    title.className = "hist-item";
-    title.innerHTML = `<div class="t">📌 ${escapeHtml(item?.description ?? "")}</div>`;
-    histItemEvents.appendChild(title);
-
-    if (!events.length) {
-      const empty = document.createElement("div");
-      empty.className = "hist-item";
-      empty.textContent = "Aucun événement pour cet item.";
-      histItemEvents.appendChild(empty);
-      return;
-    }
-
-    for (const ev of events.slice(0, 300)) {
-      const box = document.createElement("div");
-      box.className = "hist-item";
-      if (ev.type === "done") {
-        box.innerHTML = `<div class="t">✅ Fait</div><div class="s">${fmtDT(ev.ts)}</div>`;
-      } else if (ev.type === "alert") {
-        box.innerHTML = `<div class="t">🚨 Alerte - dû depuis ${ev.extra.daysDue} j</div>
-           <div class="s">${fmtDT(ev.ts)} • Échéance: ${ev.extra.dueDateYMD}</div>`;
-      } else {
-        box.innerHTML = `<div class="t">⏩ Report +${ev.extra.days} jour(s)</div>
-           <div class="s">${fmtDT(ev.ts)} • Avant: ${ev.extra.previousDueDateYMD} → Après: ${ev.extra.newDueDateYMD}</div>`;
-      }
-      const actions = document.createElement("div");
-      actions.className = "hist-actions";
-      if (ev.type !== "postpone") {
-        const btnEdit = document.createElement("button");
-        btnEdit.className = "btn-edit-hist";
-        btnEdit.textContent = "✏️ Modifier";
-        btnEdit.addEventListener("click", () => editHistEntry({ ...ev, itemId: itemId }));
-        const btnDel = document.createElement("button");
-        btnDel.className = "btn-del-hist";
-        btnDel.textContent = "🗑 Supprimer";
-        btnDel.addEventListener("click", () => deleteHistEntry({ ...ev, itemId: itemId }));
-        actions.appendChild(btnEdit);
-        actions.appendChild(btnDel);
-      }
-      box.appendChild(actions);
-      histItemEvents.appendChild(box);
     }
   }
 
@@ -1197,7 +1226,7 @@
     dlg.close();
 
     if (result !== "save") {
-      if (histWasOpen) { dlgHistory.showModal(); await renderHistoryGlobal(); await renderHistoryItemPicker(); }
+      if (histWasOpen) { dlgHistory.showModal(); await renderHistoryGlobal(); }
       return;
     }
 
@@ -1229,7 +1258,6 @@
 
   async function refreshHistAndMain() {
     await renderHistoryGlobal();
-    await renderHistoryItemPicker();
     await render();
   }
 
