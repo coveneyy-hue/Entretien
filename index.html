@@ -322,6 +322,24 @@
   </div>
 </dialog>
 
+<dialog id="dlgPostpone">
+  <div class="modal-head">
+    <strong>⏩ Reporter la tâche</strong>
+    <button id="btnClosePostpone" aria-label="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <div id="postponeItemName" style="font-weight:900; margin-bottom:10px;"></div>
+    <label>Reporter de combien de jours ?
+      <input id="postponeDays" type="number" min="1" step="1" value="7" placeholder="Ex: 7" />
+    </label>
+    <div id="postponePreview" style="margin-top:8px; font-size:12px; color:#555;"></div>
+  </div>
+  <div class="modal-foot">
+    <button id="btnCancelPostpone">Annuler</button>
+    <button id="btnConfirmPostpone" class="primary">Confirmer le report</button>
+  </div>
+</dialog>
+
 <script>
 (() => {
   const pad2 = n => String(n).padStart(2, "0");
@@ -451,7 +469,7 @@
     const refDate = last ? new Date(last) : fromYMD(item.dateDebut);
     refDate.setHours(0,0,0,0);
 
-    const dueDate = addDays(refDate, Number(item.intervalJours));
+    const dueDate = addDays(refDate, Number(item.intervalJours) + Number(item.postponedDays || 0));
     dueDate.setHours(0,0,0,0);
 
     const daysDue = Math.max(0, daysBetween(dueDate, today));
@@ -621,6 +639,13 @@
     for (const itemId of pending) {
       const id = await nextId();
       await put("checks", { id, itemId, dateCheck: now });
+      // Reset postpone when task is marked done
+      const items = await getAll("items");
+      const item = items.find(i => i.id === itemId);
+      if (item && item.postponedDays) {
+        item.postponedDays = 0;
+        await put("items", item);
+      }
     }
 
     pending.clear();
@@ -653,6 +678,45 @@
     `;
     dueBanner.classList.remove("hidden");
   }
+
+  const dlgPostpone = document.querySelector("#dlgPostpone");
+  const postponeDaysInput = document.querySelector("#postponeDays");
+  const postponePreview = document.querySelector("#postponePreview");
+  const postponeItemName = document.querySelector("#postponeItemName");
+
+  let postponingItem = null;
+  let postponingStatus = null;
+
+  function updatePostponePreview() {
+    const days = parseInt(postponeDaysInput.value, 10);
+    if (!postponingStatus || isNaN(days) || days < 1) { postponePreview.textContent = ""; return; }
+    const newDue = addDays(postponingStatus.dueDate, days);
+    postponePreview.textContent = `→ Nouvelle échéance : ${toYMD(newDue)}`;
+  }
+
+  function openPostpone(item, st) {
+    postponingItem = item;
+    postponingStatus = st;
+    postponeItemName.textContent = item.description;
+    postponeDaysInput.value = 7;
+    updatePostponePreview();
+    dlgPostpone.showModal();
+    setTimeout(() => postponeDaysInput.focus(), 50);
+  }
+
+  document.querySelector("#btnClosePostpone").addEventListener("click", () => dlgPostpone.close());
+  document.querySelector("#btnCancelPostpone").addEventListener("click", () => dlgPostpone.close());
+  postponeDaysInput.addEventListener("input", updatePostponePreview);
+
+  document.querySelector("#btnConfirmPostpone").addEventListener("click", async () => {
+    const days = parseInt(postponeDaysInput.value, 10);
+    if (isNaN(days) || days < 1) { alert("Veuillez entrer un nombre de jours valide (>= 1)."); return; }
+    const item = postponingItem;
+    item.postponedDays = (item.postponedDays || 0) + days;
+    await put("items", item);
+    dlgPostpone.close();
+    await render();
+  });
 
   async function render() {
     const items = await getAll("items");
@@ -687,6 +751,10 @@
           : `Il reste ${daysRemaining} jour(s)`;
       const badge = st.isDue ? `<span class="status due">DU (${st.daysDue} j)</span>` : `<span class="status ok">OK</span>`;
 
+      const postponedLabel = item.postponedDays
+        ? `<span class="status" style="color:#7a4f00;border-color:#ffe0a0;background:#fffbf0;">⏩ +${item.postponedDays} j</span>`
+        : "";
+
       const row = document.createElement("div");
       row.className = "row";
       row.tabIndex = 0;
@@ -709,6 +777,8 @@
         </div>
         <div class="actions">
           ${badge}
+          ${postponedLabel}
+          ${st.isDue ? `<button class="btn-postpone" title="Reporter">⏩</button>` : ""}
           <button title="Modifier">✏️</button>
           <button class="danger" title="Supprimer">🗑️</button>
         </div>
@@ -726,8 +796,14 @@
         updatePendingInfo();
       });
 
-      const btnEdit = row.querySelectorAll(".actions button")[0];
-      const btnDel  = row.querySelectorAll(".actions button")[1];
+      const btnPostpone = row.querySelector(".btn-postpone");
+      const actionBtns = row.querySelectorAll(".actions button:not(.btn-postpone)");
+      const btnEdit = actionBtns[0];
+      const btnDel  = actionBtns[1];
+
+      if (btnPostpone) {
+        btnPostpone.addEventListener("click", (e) => { e.stopPropagation(); openPostpone(item, st); });
+      }
 
       btnEdit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(item); });
       btnDel.addEventListener("click", async (e) => {
